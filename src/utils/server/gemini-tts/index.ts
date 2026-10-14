@@ -102,7 +102,9 @@ function toFailure(error: unknown): GeminiTTSFailure {
 export async function synthesizeGeminiTTS(
   request: GeminiTTSSynthesizeRequest,
 ): Promise<GeminiTTSSynthesizeResponse> {
-  const text = request.text.trim()
+  // A message from a page still running an older build of the extension can leave a field out,
+  // so neither is trusted to be a string: a throw here never reaches the caller as a result.
+  const text = typeof request.text === "string" ? request.text.trim() : ""
   if (!text) {
     return failure("INVALID_TEXT", "Text is empty")
   }
@@ -111,7 +113,7 @@ export async function synthesizeGeminiTTS(
     return failure("MISSING_API_KEY", "Gemini API key is not set")
   }
 
-  const style = request.style.trim()
+  const style = typeof request.style === "string" ? request.style.trim() : ""
   const directionsInPrompt = readsDirectionsFromPrompt(request.model)
   try {
     const google = createGoogleGenerativeAI({

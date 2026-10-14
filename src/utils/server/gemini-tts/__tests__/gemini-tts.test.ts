@@ -119,6 +119,25 @@ describe("synthesizeGeminiTTS", () => {
     ])
   })
 
+  it("speaks without a style when the request leaves it out", async () => {
+    const fetchMock = mockFetch(200, audioResponse("audio/wav"))
+    const { style: _style, ...request } = REQUEST
+    const result = await synthesizeGeminiTTS(request as typeof REQUEST)
+
+    expect(result).toMatchObject({ ok: true })
+    expect(requestOf(fetchMock).body.contents[0].parts).toEqual([{ text: "Hello" }])
+  })
+
+  it("reports a request without text instead of throwing", async () => {
+    const fetchMock = mockFetch(200, {})
+    const { text: _text, ...request } = REQUEST
+    expect(await synthesizeGeminiTTS(request as typeof REQUEST)).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_TEXT" },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it("wraps raw PCM in a WAV header at the reported sample rate", async () => {
     const pcm = btoa(String.fromCharCode(1, 2, 3, 4))
     mockFetch(200, audioResponse("audio/L16;codec=pcm;rate=16000", pcm))

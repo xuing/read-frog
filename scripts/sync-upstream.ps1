@@ -1,5 +1,6 @@
 # Fork-only. Merges upstream's main into this fork and rebuilds the extension
-# into .output/chrome-mv3, so the unpacked extension Chrome loads stays current.
+# into .output/chrome-mv3, so the unpacked extension Chrome loads stays current,
+# then pushes the merge to origin.
 #
 #   pwsh scripts/sync-upstream.ps1            # sync now
 #   pwsh scripts/sync-upstream.ps1 -Install   # run at every logon
@@ -118,6 +119,14 @@ try {
   Invoke-Step "build" { pnpm build }
 
   Write-Log "Merged $behind upstream commit(s) and rebuilt. Restart Chrome or reload the extension to use it."
+
+  # The build is what matters locally, so a push that fails is only logged.
+  git push --quiet origin main 2>&1 | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Log "Pushed to origin."
+  } else {
+    Write-Log "Could not push to origin; the next sync tries again."
+  }
 } catch {
   $reason = $_.Exception.Message
   if ($merged) {

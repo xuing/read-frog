@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
 } from "../constants/config"
 import { logger } from "../logger"
+import { repairForkConfigVersion } from "./fork-repair"
 import { runMigration } from "./migration"
 
 export interface InitializeConfigResult {
@@ -46,7 +47,11 @@ export async function initializeConfig(): Promise<InitializeConfigResult> {
     isFreshInstall = true
   } else {
     config = storedConfig
-    currentVersion = configMeta?.schemaVersion ?? 1
+    currentVersion = repairForkConfigVersion(
+      storedConfig,
+      configMeta?.schemaVersion ?? 1,
+      CONFIG_SCHEMA_VERSION,
+    )
   }
 
   while (currentVersion < CONFIG_SCHEMA_VERSION) {

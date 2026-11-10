@@ -3630,10 +3630,8 @@ export const DEFAULT_GEMINI_TTS_CONFIG: GeminiTTSConfig = {
 }
 
 export const ttsConfigSchema = z.object({
-  // `.default()` mirrors `translationHubSchema`: it lets a v112 config still parse in UI contexts
-  // that load ahead of the background migration, instead of falling back to DEFAULT_CONFIG and
-  // writing that over the user's settings. The migration still preselects a Google provider for
-  // a `gemini` block stored this way.
+  // `.default()` stands in for a migration: this fork adds these fields without a config schema
+  // version of its own, so a config saved before them still parses and takes the defaults.
   provider: ttsProviderSchema.default("edge-tts"),
   gemini: geminiTTSConfigSchema.default(DEFAULT_GEMINI_TTS_CONFIG),
   defaultVoice: ttsVoiceSchema,

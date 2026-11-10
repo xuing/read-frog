@@ -1,3 +1,5 @@
+import type { NoteOriginInput } from "@read-frog/definitions"
+import type { SurfaceByFeature } from "@/types/analytics"
 import type { SelectionToolbarCustomAction } from "@/types/config/selection-toolbar"
 import { IconBookmarkPlus } from "@tabler/icons-react"
 import { Button } from "@/components/ui/base-ui/button"
@@ -10,12 +12,20 @@ import { useSaveToNotebase } from "./use-save-to-notebase"
 
 export function SaveToNotebaseButton({
   action,
+  failed,
   isRunning,
   result,
+  surface,
+  getNoteOrigin,
 }: {
   action: SelectionToolbarCustomAction
+  /** The run ended in an error: `result` is only what streamed before it, so it is not saved. */
+  failed: boolean
   isRunning: boolean
   result: Record<string, unknown> | null
+  surface: SurfaceByFeature["note_save"]
+  /** Where the note came from, read when the save starts. */
+  getNoteOrigin?: () => NoteOriginInput | null
 }) {
   const connection = sanitizeCustomActionNotebaseConnection(
     action.notebaseConnection,
@@ -29,16 +39,17 @@ export function SaveToNotebaseButton({
       return
     }
 
-    void save({ action, results: [result] })
+    void save({ action, results: [result], surface, origin: getNoteOrigin?.() ?? null })
   }
 
   const isDisabled = connection
     ? isSessionPending ||
       isRunning ||
+      failed ||
       !result ||
       (isAuthenticated && !hasCurrentAccount) ||
       isSaving
-    : isSessionPending || isRunning || !result
+    : isSessionPending || isRunning || failed || !result
   const label =
     connection && isSaving ? i18n.t("action.saveToNotebaseSaving") : i18n.t("action.saveToNotebase")
 

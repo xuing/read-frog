@@ -30,6 +30,7 @@ import {
   HostedAiRateLimitErrorDataSchema,
   HostedAiStreamStructuredObjectInputSchema,
   HostedAiStreamTextInputSchema,
+  HostedAiTierRestrictedDataSchema,
 } from "@read-frog/api-contract"
 import { generateText, Output, parsePartialJson, streamText } from "ai"
 import { z } from "zod"
@@ -418,7 +419,23 @@ function getHostedAiQuotaExhaustedAction(error: unknown): ErrorAction | undefine
   const parsed = HostedAiQuotaExhaustedDataSchema.safeParse(
     isRecord(error) ? error.data : undefined,
   )
-  return parsed.success && parsed.data.policyId === "ultra-weekly-v1" ? undefined : upgradeAction()
+  return parsed.success && parsed.data.policyId === "ultra-weekly-v1"
+    ? undefined
+    : upgradeAction("extension_quota_exhausted")
+}
+
+/**
+ * Names the plan the wall asks for: "Pro or Ultra" when Pro is enough. A
+ * payload that fails to parse, as from a server that predates `upgradeTo`,
+ * reads as Ultra, the only plan that server walls behind.
+ */
+function getHostedAiTierRestrictedMessage(error: unknown): string {
+  const parsed = HostedAiTierRestrictedDataSchema.safeParse(
+    isRecord(error) ? error.data : undefined,
+  )
+  return parsed.success && parsed.data.upgradeTo === "pro"
+    ? i18n.t("hostedAi.availability.proRequired")
+    : i18n.t("hostedAi.availability.ultraRequired")
 }
 
 function normalizeHostedAiError(error: unknown): unknown {
@@ -427,7 +444,7 @@ function normalizeHostedAiError(error: unknown): unknown {
       return withRequestErrorMeta(
         new BackgroundStreamError(
           "HOSTED_AI_TIER_RESTRICTED",
-          i18n.t("hostedAi.availability.ultraRequired"),
+          getHostedAiTierRestrictedMessage(error),
           { cause: error },
         ),
         { isRetryable: false, kind: "access-denied" },

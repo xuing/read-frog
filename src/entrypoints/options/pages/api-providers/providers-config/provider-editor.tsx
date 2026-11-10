@@ -2,11 +2,12 @@ import type { AutosaveController } from "@/components/form/autosave-controller"
 import type { APIProviderConfig } from "@/types/config/provider"
 import type { FeatureKey } from "@/utils/constants/feature-providers"
 import type { BuiltInAiProviderId } from "@/utils/constants/provider-ids"
+import type { HostedAiUpgradePlan } from "@/utils/hosted-ai/types"
 import { Icon } from "@iconify/react"
 import { useSelector } from "@tanstack/react-store"
 import { useAtomValue, useSetAtom } from "jotai"
 import { createContext, use, useState } from "react"
-import { PlanBadge } from "@/components/badges/plan-badge"
+import { UpgradePlanBadge } from "@/components/badges/upgrade-plan-badge"
 import { useAutosave } from "@/components/form/use-autosave"
 import ProviderIcon from "@/components/provider-icon"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -397,13 +398,13 @@ function AssignmentRow({
   checked,
   children,
   disabled = false,
-  requiresUltra = false,
+  upgradeTo,
   onCheckedChange,
 }: {
   checked: boolean
   children: React.ReactNode
   disabled?: boolean
-  requiresUltra?: boolean
+  upgradeTo?: HostedAiUpgradePlan
   onCheckedChange: (checked: boolean) => void
 }) {
   return (
@@ -413,9 +414,7 @@ function AssignmentRow({
     <label className="flex w-fit items-center gap-2">
       <Switch checked={checked} disabled={checked || disabled} onCheckedChange={onCheckedChange} />
       <span className="text-sm">{children}</span>
-      {requiresUltra && (
-        <PlanBadge plan="ultra" upgradeTooltip={i18n.t("hostedAi.ultraBadge.tooltip")} />
-      )}
+      {upgradeTo && <UpgradePlanBadge plan={upgradeTo} />}
     </label>
   )
 }
@@ -461,10 +460,10 @@ function CompatibleFeatureAssignments() {
 
 function LanguageDetectionAssignment({
   disabled = false,
-  requiresUltra = false,
+  upgradeTo,
 }: {
   disabled?: boolean
-  requiresUltra?: boolean
+  upgradeTo?: HostedAiUpgradePlan
 } = {}) {
   const {
     state: {
@@ -487,7 +486,7 @@ function LanguageDetectionAssignment({
     <AssignmentRow
       checked={isAssigned}
       disabled={disabled}
-      requiresUltra={requiresUltra}
+      upgradeTo={upgradeTo}
       onCheckedChange={(checked) => {
         if (checked) void actions.assignLanguageDetection()
       }}
@@ -527,17 +526,17 @@ function TTSAssignment() {
  * A single feature row (from FEATURE_KEYS) for the built-in provider editors.
  * Local API providers keep using CompatibleFeatureAssignments; this row exists
  * so the built-in editors can offer their hosted-capable features without
- * pretending to a providerType. `requiresUltra` marks the plan requirement (a
- * viewer-independent product fact), `disabled` the viewer's actual access.
+ * pretending to a providerType. `upgradeTo` is the plan this account lacks for
+ * it (badged), `disabled` the viewer's actual access.
  */
 function FeatureAssignment({
   featureKey,
   disabled = false,
-  requiresUltra = false,
+  upgradeTo,
 }: {
   featureKey: FeatureKey
   disabled?: boolean
-  requiresUltra?: boolean
+  upgradeTo?: HostedAiUpgradePlan
 }) {
   const {
     state: {
@@ -552,7 +551,7 @@ function FeatureAssignment({
     <AssignmentRow
       checked={isAssigned}
       disabled={disabled}
-      requiresUltra={requiresUltra}
+      upgradeTo={upgradeTo}
       onCheckedChange={(checked) => {
         if (checked) void actions.assignFeature(featureKey)
       }}
@@ -564,10 +563,10 @@ function FeatureAssignment({
 
 function CustomActionAssignments({
   disabled = false,
-  requiresUltra = false,
+  upgradeTo,
 }: {
   disabled?: boolean
-  requiresUltra?: boolean
+  upgradeTo?: HostedAiUpgradePlan
 }) {
   const {
     state: {
@@ -588,7 +587,7 @@ function CustomActionAssignments({
         key={action.id}
         checked={isAssigned}
         disabled={disabled}
-        requiresUltra={requiresUltra}
+        upgradeTo={upgradeTo}
         onCheckedChange={(checked) => {
           if (checked) void actions.assignCustomAction(action.id)
         }}

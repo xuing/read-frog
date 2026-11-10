@@ -49,6 +49,7 @@ import {
   getNotebaseDetailUrl,
   getPendingNotebaseSave,
   getPendingNotebaseSaveContext,
+  getPendingNoteSaveAnalyticsSurface,
   isPendingNotebaseSaveExpired,
   validateStillCanSavePendingConnectedNotebaseSave,
   validateStillCanSavePendingCreateNotebaseSave,
@@ -92,6 +93,7 @@ function reportPendingSaveOutcome(
 ) {
   const context = getPendingNotebaseSaveContext(pendingNotebaseSave)
   deps.reportNoteSave({
+    surface: getPendingNoteSaveAnalyticsSurface(pendingNotebaseSave),
     saveSource: context.surface,
     isGuide: context.isGuide,
     noteCount:
@@ -310,6 +312,8 @@ async function createReplacementNotebaseFromConnectedPending(
     {
       guideDictionaryNotebaseTracking: pendingNotebaseSave.guideDictionaryNotebaseTracking,
       ...(pendingNotebaseSave.saveSource ? { saveSource: pendingNotebaseSave.saveSource } : {}),
+      analyticsSurface: pendingNotebaseSave.analyticsSurface,
+      ...(pendingNotebaseSave.origin ? { origin: pendingNotebaseSave.origin } : {}),
     },
   )
 
@@ -615,8 +619,11 @@ async function processConnectedPendingSave(
     return
   }
 
+  // The current connection, not the snapshot: validation checked that its
+  // Notebase and mappings still match, and fields the reader set to "don't
+  // save" since the click must not be written back as undecided.
   const refreshedConnection = refreshNotebaseConnectionAccountSnapshot(
-    pendingNotebaseSave.connectionSnapshot,
+    validation.action.notebaseConnection ?? pendingNotebaseSave.connectionSnapshot,
     connectedAccount,
     schema.name,
   )
@@ -650,6 +657,7 @@ async function processConnectedPendingSave(
   )
 
   const noteSave = getPendingNotebaseSaveContext(pendingNotebaseSave)
+  const originField = pendingNotebaseSave.origin ? { origin: pendingNotebaseSave.origin } : {}
   try {
     const [firstCells] = cellsList
     if (cellsList.length === 1 && firstCells) {
@@ -658,6 +666,7 @@ async function processConnectedPendingSave(
           notebaseId: refreshedConnection.notebaseId,
           data: {
             cells: firstCells,
+            ...originField,
           },
         },
         noteSave,
@@ -666,7 +675,7 @@ async function processConnectedPendingSave(
       await deps.createRows(
         {
           notebaseId: refreshedConnection.notebaseId,
-          rows: cellsList.map((cells) => ({ cells })),
+          rows: cellsList.map((cells) => ({ cells, ...originField })),
         },
         noteSave,
       )
@@ -701,14 +710,16 @@ async function processConnectedPendingSave(
       return
     }
 
+    // The mappings were checked against a fresh schema just before the write,
+    // so a rejected cell is a value in the answer. Opening the mappings would
+    // send the reader to change a connection that works.
     if (isORPCValidationError(error)) {
-      await clearConnectedPendingAndOpenActionOptions(
-        deps,
-        pendingNotebaseSave,
-        "[NotebasePendingSave] Cleared connected pending save after row validation error",
+      await deps.clearPendingNotebaseSave()
+      reportPendingSaveOutcome(deps, pendingNotebaseSave, error)
+      deps.log.warn(
+        "[NotebasePendingSave] Cleared connected pending save after the server rejected a cell",
         error,
       )
-      reportPendingSaveOutcome(deps, pendingNotebaseSave, error)
       return
     }
 

@@ -36,7 +36,7 @@ function tier(overrides: Partial<HostedAiTierStatus> = {}): HostedAiTierStatus {
     accessAllowed: true,
     available: true,
     unavailableReason: null,
-    requiresUltra: false,
+    upgradeTo: null,
     modelRevision: "normal-r7",
     ...overrides,
   }
@@ -44,7 +44,7 @@ function tier(overrides: Partial<HostedAiTierStatus> = {}): HostedAiTierStatus {
 
 function status(normal: HostedAiTierStatus = tier()): HostedAiStatus {
   return {
-    credits: [],
+    pools: [],
     features: {
       pageTranslation: { normal, advance: tier({ modelRevision: "advance-r4" }) },
       videoSubtitles: { normal, advance: tier({ modelRevision: "advance-r4" }) },

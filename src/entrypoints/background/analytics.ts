@@ -66,7 +66,7 @@ const FEATURE_SURFACES = listEveryFeatureSurface({
     "touch_gesture",
   ],
   selection_translation: ["selection_toolbar", "context_menu", "shortcut"],
-  custom_ai_action: ["selection_toolbar", "context_menu", "shortcut"],
+  custom_ai_action: ["selection_toolbar", "context_menu", "shortcut", "video_subtitles"],
   input_translation: ["input_translation"],
   translation_hub: ["translation_hub"],
   video_subtitles: ["video_subtitles", "video_subtitles_auto", "shortcut"],
@@ -76,10 +76,12 @@ const FEATURE_SURFACES = listEveryFeatureSurface({
     "shortcut",
     "tts_settings",
     "translation_hub",
+    "video_subtitles",
   ],
   note_suggestion: ["selection_toolbar"],
-  note_save: ["selection_toolbar"],
+  note_save: ["selection_toolbar", "video_subtitles"],
   glossary: ["page_translation", "video_subtitles", "selection_toolbar", "input_translation"],
+  word_annotation: ["selection_toolbar", "shortcut", "annotation_mode"],
 })
 
 /** The tab a feature was used in, as reported by the message sender. */
@@ -540,6 +542,17 @@ function normalizeFeatureUsedEvent(
         note_count: event.note_count,
         path: event.path,
         is_guide: event.is_guide,
+      }
+    })
+    .with({ feature: "word_annotation" }, (event) => {
+      if (!isCharCount(event.char_count) || !isLanguageCode(event.target_language)) return null
+      return {
+        ...common,
+        ...siteProperties,
+        feature: event.feature,
+        surface: event.surface,
+        char_count: event.char_count,
+        target_language: event.target_language,
       }
     })
     .with({ feature: "text_to_speech" }, (event) => ({

@@ -115,6 +115,7 @@ options:
     product: Продукт
   tools:
     translationHub: Центр переводов
+    pdfTranslation: Перевод PDF
   product:
     roadmap: Дорожная карта
   helpAndCommunity:
@@ -157,6 +158,8 @@ options:
       resetsAt: "Сброс: $1"
       daily: Дневная квота
       weekly: Недельная квота
+      oneTime: Бонусная квота
+      expiresAt: "Истекает: $1"
       features:
         pageTranslation: Перевод страницы
         customAction: Пользовательские AI-действия
@@ -165,14 +168,15 @@ options:
         videoSubtitles: Субтитры видео
         inputTranslation: Перевод ввода
         languageDetection: Определение языка
+        pdfTranslation: Перевод PDF
     sponsorCta: Получить быстрый и выгодный ИИ
-    sponsorCtaJalapenoCloud: Получить GLM 5.2 со скидкой 50 %
+    sponsorCtaJalapenoCloud: Получить GLM 5.3 со скидкой 50 %
     setApiKeyWarning:
       message: Укажите API-ключ на странице $1
     badges:
       featureCount: $1 функций
       sponsor: Спонсор
-      sponsorJalapenoCloud: $$2 бесплатно
+      sponsorJalapenoCloud: $$1 бесплатно
     dialog:
       title: Добавить нового провайдера
       groups:
@@ -251,7 +255,7 @@ options:
         customChatComplete: Пользовательский Chat Complete
         customResponses: Пользовательский Responses
       attribution:
-        builtInAi: Стандартная модель, размещённая Read Frog. Пользователи без Ultra могут использовать её только в пользовательских AI-действиях; пользователям Ultra доступно больше функций.
+        builtInAi: Стандартная модель, размещённая Read Frog. Подписчики Pro и Ultra могут использовать её во всех функциях в рамках недельной квоты; на бесплатном тарифе она доступна только в пользовательских AI-действиях.
         builtInAiAdvance: Продвинутая модель, размещённая Read Frog, — только для подписчиков Ultra. Работает во всех функциях встроенного ИИ — переводе страниц, пользовательских AI-действиях и других — с общей недельной квотой. Расходует квоту быстрее, чем стандартная модель.
       description:
         openai: Предоставляет модели, такие как GPT-4o
@@ -307,7 +311,7 @@ options:
         noteSuggestion: Подсказки для заметок
       descriptions:
         pageTranslation: Переводит страницу целиком — в двуязычном режиме или с заменой оригинала.
-        selectionTranslation: Переводит выделенный текст через панель выделения.
+        selectionTranslation: "Переводит выделенный текст; аннотации слов тоже берут значение отсюда."
         inputTranslation: Переводит то, что вы набрали в поле ввода, перед отправкой.
         videoSubtitles: Переводит субтитры, которые появляются в видеоплеере.
         noteSuggestion: Предлагает слова, которые стоит сохранить в Notebase, после перевода выделенного текста.
@@ -545,6 +549,12 @@ options:
     selectionSpeak:
       title: "Озвучивание выделения"
       description: "Прочитать выделенный текст вслух. Нажмите ещё раз, чтобы остановить."
+    selectionAnnotation:
+      title: "Аннотировать"
+      description: "Подчеркнуть выделенный текст и показать его значение между строк."
+    selectionAnnotationMode:
+      title: "Режим аннотаций"
+      description: "Включить или выключить режим аннотаций, не открывая панель. Пока он включён, любой выделенный текст аннотируется."
     actions:
       title: "AI-действия"
       description: "Запустить AI-действие для выделенного текста. У пользовательских действий нет сочетания клавиш, пока вы не зададите его здесь."
@@ -617,6 +627,14 @@ options:
     enable:
       title: Включить панель выделения
       description: Показывать панель при выделении текста на веб-страницах для быстрого перевода, озвучивания и AI-действий
+    annotation:
+      title: "Аннотации слов"
+      enable:
+        title: "Включить"
+        description: "Подчёркивает выделенное слово или фразу и записывает его значение между строк"
+      provider:
+        title: "Провайдер"
+        description: "Даёт значение; та же настройка, что у перевода выделенного"
     actions:
       title: Действия
       translate:
@@ -780,6 +798,8 @@ options:
             unquotedAttributeOutput: Заключите значение атрибута в кавычки, иначе значение может выйти за его пределы.
             filterIgnored: В теге «$1» фильтры игнорируются. Сначала присвойте отфильтрованное значение.
             newlineToBrNotLast: newline_to_br работает только как последний фильтр вывода.
+            mathFilterNotLast: $1 работает только как последний фильтр вывода.
+            mathFilterInAttribute: Не используйте $1 внутри значения атрибута. В отрисованных формулах есть кавычки, и они закрывают атрибут.
             tooLong: Макет длиннее $1 символов и не может быть сохранён.
             fieldNotShown: «$1» не показывается в этом макете.
             reservedFieldName: Имя поля «$1» зарезервировано в макетах. Переименуйте поле.
@@ -814,16 +834,16 @@ options:
           schemaErrorDescription: Попробуйте обновить схему ещё раз чуть позже.
           schemaLoading: Загрузка схемы notebase...
           mappingsLabel: Сопоставления полей
-          mappingsEmpty: Сопоставлений пока нет. Добавьте хотя бы одно, когда будете готовы сохранять поля.
-          addMappingAction: Добавить сопоставление
-          removeMappingAction: Удалить сопоставление
           localFieldLabel: Поле действия
-          localFieldPlaceholder: Выберите поле действия
           remoteFieldLabel: Поле Notebase
-          remoteFieldPlaceholder: Выберите поле notebase
           columnUnavailableOption: удалено
           invalidMappingsTitle: Некоторые сопоставления требуют внимания
           invalidMappingsDescription: Некорректные сопоставления сохранены. Исправьте их перед сохранением в Notebase.
+          noFieldSavedTitle: "В этот Notebase не сохраняется ни одно поле"
+          noFieldSavedDescription: "Чтобы сохранять заметки, выберите поле Notebase хотя бы для одного поля."
+          mappingSummary: "Сохраняются: $1 · Пропущены: $2 · Не решено: $3"
+          skipFieldOption: "Не сохранять"
+          undecidedFieldPlaceholder: "Выберите поле Notebase или не сохраняйте"
           mappingMissingLocal: Сопоставленное поле действия больше не существует.
           mappingMissingRemote: Сопоставленное поле notebase больше не существует.
           mappingMissingSchema: Обновите схему notebase, чтобы проверить это сопоставление.
@@ -1448,13 +1468,19 @@ options:
       title: Основное
       enable:
         title: Включить видеосубтитры
-        description: Добавляет кнопку перевода в панель управления плеера на YouTube, X и Netflix.
+        description: Добавляет кнопку перевода в панель управления плеера на YouTube, X, Netflix, Bilibili, Udemy и edX.
       autoStart:
         title: Переводить сразу при открытии
         description: Начинать перевод субтитров, как только видео загрузилось, без нажатия кнопки.
       aiSegmentation:
         title: Умная сегментация ИИ
-        description: ИИ заново режет субтитры на строки, читающиеся как предложения. Тайминг он задаёт сам, поэтому строки могут расходиться с речью. Нужен LLM-провайдер перевода.
+        description: ИИ заново делит субтитры на предложения. Перевод будет появляться дольше. Нужна сильная LLM; слабые модели могут терять или сдвигать строки.
+      wordLookupAction:
+        title: Действие для слова
+        description: ИИ-действие, которое запускается при нажатии на слово в субтитрах. По умолчанию словарь, можно выбрать своё.
+      pauseOnHover:
+        title: Пауза при наведении
+        description: Ставит видео на паузу, пока указатель задерживается на субтитрах, и продолжает воспроизведение, когда он уходит. Нажатие на слово для поиска всегда ставит паузу.
     aiQuota:
       title: Лимит ИИ-субтитров
       description: ИИ распознаёт речь и создаёт точные субтитры для любого видео
@@ -1607,6 +1633,19 @@ translation:
   sameLanguage: Исходный и целевой языки должны различаться
   autoModeSameLanguage: Обнаруженный язык '$1' совпадает с целевым языком
   extensionContextInvalidated: Расширение обновлено. Обновите эту страницу и повторите попытку.
+annotation:
+  annotate: "Аннотировать"
+  enterMode: "Режим аннотаций"
+  exitMode: "Выйти из режима аннотаций"
+  modeLabel: "Режим аннотаций"
+  noTextSelected: "Текст не выделен"
+  tooLong: "Выделите слово или короткую фразу, чтобы аннотировать"
+  multipleParagraphs: "Выделите текст в пределах одного абзаца, чтобы аннотировать"
+  translatedTextUnsupported: "Переведённый текст нельзя аннотировать"
+  unsupportedPlace: "Этот текст здесь нельзя аннотировать"
+  markOnly: "Отмечено. Между этими строками нет места для значения."
+  failed: "Не удалось получить значение"
+  remove: "Удалить аннотацию"
 speak:
   languageDetectionFallback: Используется локальное определение языка
   languageDetectionSettingsHint: В настройках выберите доступную LLM или локальное определение.
@@ -1632,6 +1671,10 @@ action:
   saveToNotebaseLimitExceeded: Для сохранения большего числа заметок Notebase требуется апгрейд
   saveToNotebaseTableUnavailable: Выбранная Notebase больше недоступна
   saveToNotebaseConnectionInvalid: Это подключение Notebase устарело. Обновите его в Custom AI Actions и исправьте сопоставления.
+  saveToNotebaseInvalidContent: "В ответе ИИ есть значение в неверном формате, поэтому он не сохранён. Запустите действие ещё раз и сохраните."
+  saveToNotebaseNoFieldSaved: "Не сохранено: это действие не сохраняет в Notebase ни одного поля. Выберите хотя бы одно в настройках."
+  saveToNotebaseUndecidedTitle: "Сохранено. Вы ещё не решили, сохранять ли эти поля"
+  saveToNotebaseSkipUndecided: "Не сохранять их"
   saveToNotebaseNoMappings: Добавьте хотя бы одно корректное сопоставление перед сохранением
   saveToNotebaseCreateTitle: Создать Notebase?
   saveToNotebaseCreateDescription: Создать Notebase с колонками из этого Custom Action и сохранить текущий результат как первую заметку.
@@ -1702,10 +1745,12 @@ subtitles:
   aiSubtitlesHint: Точные субтитры создаются с помощью передового ИИ-распознавания речи и доступны даже без официальных субтитров.
   requestAiSubtitles: Запросить ИИ-субтитры
   usingAiSubtitles: Используются ИИ-субтитры
+  settings: Настройки субтитров
   toggle:
     enabled: Перевод субтитров включён
     disabled: Перевод субтитров выключен
   actions:
+    download: Скачать субтитры
     downloadTranslated: Скачать переведённые субтитры
     downloadTranslatedPreparing: Подготовка субтитров, длинные видео могут занять больше времени
     downloadTranslatedTranslating: Перевод субтитров
@@ -1746,11 +1791,13 @@ subtitles:
     translatedExportIncomplete: Не удалось перевести все строки субтитров
     translatedExportSameLanguage: Исходный и целевой языки совпадают
 hostedAi:
-  ultraBadge:
-    tooltip: Требуется план Ultra · Нажмите на значок, чтобы получить его
+  planBadge:
+    pro: Требуется план Pro или Ultra · Нажмите на значок, чтобы получить его
+    ultra: Требуется план Ultra · Нажмите на значок, чтобы получить его
   availability:
     authenticationRequired: Войдите, чтобы использовать этого провайдера
     ultraRequired: Требуется план Ultra
+    proRequired: Требуется план Pro или Ultra
     quotaExhausted: Квота исчерпана
     serviceUnavailable: Временно недоступно
     usedPercent: "Использовано квоты: $1%"

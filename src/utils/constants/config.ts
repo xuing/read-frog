@@ -37,6 +37,8 @@ import {
   MICROSOFT_TRANSLATE_PROVIDER_ID,
 } from "./providers"
 import {
+  DEFAULT_ANNOTATION_MODE_SHORTCUT_KEY,
+  DEFAULT_SELECTION_ANNOTATION_SHORTCUT_KEY,
   DEFAULT_SELECTION_OVERLAY_OPACITY,
   DEFAULT_SELECTION_SPEAK_SHORTCUT_KEY,
   SELECTION_TOOLBAR_FEATURE_IDS,
@@ -69,13 +71,13 @@ import { DEFAULT_TRANSLATION_HUB_SHORTCUT_KEY } from "./translation-hub"
 import { TRANSLATION_NODE_STYLE_ON_INSTALLED } from "./translation-node-style"
 import { DEFAULT_TTS_CONFIG } from "./tts"
 
-export const CONFIG_STORAGE_KEY = "config"
+export { CONFIG_STORAGE_KEY } from "./config-storage-key"
 export const LAST_SYNCED_CONFIG_STORAGE_KEY = "lastSyncedConfig"
 export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = "__googleDriveToken"
 
 export const THEME_STORAGE_KEY = "theme"
 export const DEFAULT_DETECTED_CODE = "eng" as const
-export const CONFIG_SCHEMA_VERSION = 113
+export const CONFIG_SCHEMA_VERSION = 122
 
 export const DEFAULT_FLOATING_BUTTON_POSITION = 0.66
 export const DEFAULT_FLOATING_BUTTON_SIDE: FloatingButtonSide = "right"
@@ -240,6 +242,11 @@ export const DEFAULT_CONFIG: Config = {
         shortcut: DEFAULT_SELECTION_SPEAK_SHORTCUT_KEY,
       },
     },
+    annotation: {
+      enabled: true,
+      shortcut: DEFAULT_SELECTION_ANNOTATION_SHORTCUT_KEY,
+      modeShortcut: DEFAULT_ANNOTATION_MODE_SHORTCUT_KEY,
+    },
     builtInActions: {
       dictionary: {
         enabled: true,
@@ -288,7 +295,14 @@ export const DEFAULT_CONFIG: Config = {
   },
   videoSubtitles: {
     enabled: true,
-    autoStart: false,
+    autoStart: {
+      youtube: false,
+      xcom: false,
+      netflix: false,
+      bilibili: false,
+      udemy: false,
+      edx: false,
+    },
     toggleShortcut: DEFAULT_SUBTITLES_TOGGLE_SHORTCUT_KEY,
     providerId: MICROSOFT_TRANSLATE_PROVIDER_ID,
     style: {
@@ -312,6 +326,8 @@ export const DEFAULT_CONFIG: Config = {
       customCSS: null,
     },
     aiSegmentation: false,
+    wordLookupActionId: BUILT_IN_DICTIONARY_ACTION_ID,
+    pauseOnHover: false,
     requestQueueConfig: {
       capacity: DEFAULT_REQUEST_CAPACITY,
       rate: DEFAULT_REQUEST_RATE,

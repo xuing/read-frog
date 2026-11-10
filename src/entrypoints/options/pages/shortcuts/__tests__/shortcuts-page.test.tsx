@@ -29,6 +29,16 @@ vi.mock("../selection-speak-shortcut", () => ({
   SelectionSpeakShortcut: () => <section data-section="selection-speak-shortcut" />,
 }))
 
+vi.mock("../selection-annotation-shortcut", () => ({
+  SelectionAnnotationShortcut: () => <section data-section="selection-annotation-shortcut" />,
+}))
+
+vi.mock("../selection-annotation-mode-shortcut", () => ({
+  SelectionAnnotationModeShortcut: () => (
+    <section data-section="selection-annotation-mode-shortcut" />
+  ),
+}))
+
 vi.mock("../action-shortcuts", () => ({
   ActionShortcuts: () => <section data-section="selection-action-shortcuts" />,
 }))
@@ -58,6 +68,8 @@ describe("shortcuts page", () => {
       "translation-mode-shortcut",
       "selection-translation-shortcut",
       "selection-speak-shortcut",
+      "selection-annotation-shortcut",
+      "selection-annotation-mode-shortcut",
       "subtitles-toggle-shortcut",
       "node-translation-hotkey",
       "translation-hub-shortcut",

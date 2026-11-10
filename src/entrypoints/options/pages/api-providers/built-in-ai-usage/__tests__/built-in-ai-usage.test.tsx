@@ -42,7 +42,7 @@ describe("BuiltInAiUsageConfig", () => {
       isPending: false,
       isError: false,
       status: {
-        credits: [
+        pools: [
           {
             periodKind: "weekly",
             usedPercent: 37.6,
@@ -86,7 +86,7 @@ describe("BuiltInAiUsageConfig", () => {
       isPending: false,
       isError: false,
       status: {
-        credits: [
+        pools: [
           {
             periodKind: "daily",
             usedPercent: 120,
@@ -126,9 +126,7 @@ describe("BuiltInAiUsageConfig", () => {
       isPending: false,
       isError: false,
       status: {
-        credits: [
-          { periodKind: "daily", usedPercent: 0, resetAt: null, features: ["customAction"] },
-        ],
+        pools: [{ periodKind: "daily", usedPercent: 0, resetAt: null, features: ["customAction"] }],
         features: {} as never,
       },
     }
@@ -138,12 +136,12 @@ describe("BuiltInAiUsageConfig", () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it("treats an empty credits list like an unavailable status", () => {
+  it("treats an empty pool list like an unavailable status", () => {
     hostedAiState.value = {
       isSignedIn: true,
       isPending: false,
       isError: false,
-      status: { credits: [], features: {} as never },
+      status: { pools: [], features: {} as never },
     }
 
     render(<BuiltInAiUsageConfig />)
@@ -157,7 +155,7 @@ describe("BuiltInAiUsageConfig", () => {
       isPending: false,
       isError: false,
       status: {
-        credits: [
+        pools: [
           { periodKind: "daily", usedPercent: 10, resetAt: null, features: ["customAction"] },
           { periodKind: "weekly", usedPercent: 5, resetAt: null, features: ["pageTranslation"] },
         ],
@@ -171,5 +169,116 @@ describe("BuiltInAiUsageConfig", () => {
     expect(bars).toHaveLength(2)
     expect(bars[0]).toHaveAttribute("aria-valuenow", "90")
     expect(bars[1]).toHaveAttribute("aria-valuenow", "95")
+  })
+
+  it("names PDF translation in a pool's feature list", () => {
+    hostedAiState.value = {
+      isSignedIn: true,
+      isPending: false,
+      isError: false,
+      status: {
+        pools: [
+          {
+            periodKind: "weekly",
+            usedPercent: 0,
+            resetAt: null,
+            features: ["pageTranslation", "pdfTranslation"],
+          },
+        ],
+        features: {} as never,
+      },
+    }
+
+    render(<BuiltInAiUsageConfig />)
+
+    expect(
+      screen.getByText("options.apiProviders.builtInAiUsage.features.pdfTranslation"),
+    ).toBeInTheDocument()
+  })
+
+  it("lists a one-time pool after the recurring ones, with its expiry instead of a reset", () => {
+    hostedAiState.value = {
+      isSignedIn: true,
+      isPending: false,
+      isError: false,
+      status: {
+        pools: [
+          { periodKind: "daily", usedPercent: 40, resetAt: null, features: ["customAction"] },
+          {
+            periodKind: "once",
+            usedPercent: 12.5,
+            expiresAt: "2026-11-25T00:00:00.000Z",
+            features: ["pageTranslation", "customAction", "videoSubtitles"],
+          },
+        ],
+        features: {} as never,
+      },
+    }
+
+    render(<BuiltInAiUsageConfig />)
+
+    const bars = screen.getAllByRole("progressbar")
+    expect(bars).toHaveLength(2)
+    expect(bars[0]).toHaveAttribute("aria-valuenow", "60")
+    // 100 - 12.5 rounds to 88.
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "88")
+    expect(screen.getByText("options.apiProviders.builtInAiUsage.oneTime")).toBeInTheDocument()
+    expect(
+      screen.getByText("options.apiProviders.builtInAiUsage.supportedFeatures:3"),
+    ).toBeInTheDocument()
+    const expectedLocalExpiresAt = formatHostedAiResetAtLocal("2026-11-25T00:00:00.000Z")
+    expect(
+      screen.getByText(`options.apiProviders.builtInAiUsage.expiresAt:${expectedLocalExpiresAt}`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/builtInAiUsage\.resetsAt/)).not.toBeInTheDocument()
+  })
+
+  it("shows a one-time pool even when no recurring pool is reported", () => {
+    hostedAiState.value = {
+      isSignedIn: true,
+      isPending: false,
+      isError: false,
+      status: {
+        pools: [
+          {
+            periodKind: "once",
+            usedPercent: 100,
+            expiresAt: "2026-11-25T00:00:00.000Z",
+            features: ["customAction"],
+          },
+        ],
+        features: {} as never,
+      },
+    }
+
+    render(<BuiltInAiUsageConfig />)
+
+    // A spent one-time pool is still listed until it expires.
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0")
+    expect(screen.queryByText("hostedAi.availability.serviceUnavailable")).not.toBeInTheDocument()
+  })
+
+  it("leaves out the expiry when the server sends an unreadable one", () => {
+    hostedAiState.value = {
+      isSignedIn: true,
+      isPending: false,
+      isError: false,
+      status: {
+        pools: [
+          {
+            periodKind: "once",
+            usedPercent: 0,
+            expiresAt: "not-a-date",
+            features: ["customAction"],
+          },
+        ],
+        features: {} as never,
+      },
+    }
+
+    render(<BuiltInAiUsageConfig />)
+
+    expect(screen.getByText("options.apiProviders.builtInAiUsage.oneTime")).toBeInTheDocument()
+    expect(screen.queryByText(/builtInAiUsage\.expiresAt/)).not.toBeInTheDocument()
   })
 })

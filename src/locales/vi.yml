@@ -115,6 +115,7 @@ options:
     product: Sản phẩm
   tools:
     translationHub: Trung tâm Dịch thuật
+    pdfTranslation: Dịch PDF
   product:
     roadmap: Lộ trình
   helpAndCommunity:
@@ -157,6 +158,8 @@ options:
       resetsAt: "Đặt lại lúc $1"
       daily: Hạn mức mỗi ngày
       weekly: Hạn mức mỗi tuần
+      oneTime: Hạn mức tặng
+      expiresAt: "Hết hạn lúc $1"
       features:
         pageTranslation: Dịch trang
         customAction: Hành động AI tùy chỉnh
@@ -165,14 +168,15 @@ options:
         videoSubtitles: Phụ đề video
         inputTranslation: Dịch đầu vào
         languageDetection: Phát hiện ngôn ngữ
+        pdfTranslation: Dịch PDF
     sponsorCta: Nhận AI nhanh, tiết kiệm chi phí
-    sponsorCtaJalapenoCloud: Nhận ưu đãi giảm 50% GLM 5.2
+    sponsorCtaJalapenoCloud: Nhận ưu đãi giảm 50% GLM 5.3
     setApiKeyWarning:
       message: Hãy đặt API Key ở trang $1
     badges:
       featureCount: $1 tính năng
       sponsor: Tài trợ
-      sponsorJalapenoCloud: Miễn phí $$2
+      sponsorJalapenoCloud: Miễn phí $$1
     dialog:
       title: Thêm nhà cung cấp mới
       groups:
@@ -251,7 +255,7 @@ options:
         customChatComplete: Tùy chỉnh Chat Complete
         customResponses: Tùy chỉnh Responses
       attribution:
-        builtInAi: Mô hình tiêu chuẩn do Read Frog lưu trữ. Người dùng không có Ultra chỉ dùng được trong hành động AI tùy chỉnh; người dùng Ultra dùng được ở nhiều tính năng hơn.
+        builtInAi: Mô hình tiêu chuẩn do Read Frog lưu trữ. Người dùng Pro và Ultra dùng được ở mọi tính năng trong hạn mức tuần; ở gói miễn phí chỉ dùng được trong hành động AI tùy chỉnh.
         builtInAiAdvance: Mô hình nâng cao do Read Frog lưu trữ, dành riêng cho thành viên Ultra. Dùng được ở mọi tính năng AI tích hợp — dịch trang, hành động AI tùy chỉnh và hơn nữa — với hạn mức tuần dùng chung. Tiêu hao hạn mức nhanh hơn mô hình tiêu chuẩn.
       description:
         openai: Cung cấp các mô hình như GPT-4o
@@ -307,7 +311,7 @@ options:
         noteSuggestion: Gợi ý ghi chú
       descriptions:
         pageTranslation: Dịch toàn bộ trang ở chế độ song ngữ hoặc thay thế bản gốc.
-        selectionTranslation: Dịch đoạn văn bản bạn chọn từ thanh công cụ bôi đen.
+        selectionTranslation: "Dịch văn bản bạn chọn; nghĩa của chú thích từ cũng lấy từ đây."
         inputTranslation: Dịch nội dung bạn gõ trong ô nhập trước khi gửi.
         videoSubtitles: Dịch phụ đề hiện ra trong trình phát video.
         noteSuggestion: Gợi ý các từ đáng lưu vào Notebase sau khi dịch vùng chọn.
@@ -545,6 +549,12 @@ options:
     selectionSpeak:
       title: "Đọc vùng chọn"
       description: "Đọc to văn bản đã chọn. Nhấn lần nữa để dừng."
+    selectionAnnotation:
+      title: "Chú thích"
+      description: "Gạch chân văn bản đã chọn và ghi nghĩa của nó giữa các dòng."
+    selectionAnnotationMode:
+      title: "Chế độ chú thích"
+      description: "Bật hoặc tắt chế độ chú thích mà không cần mở thanh công cụ. Khi bật, mọi văn bản bạn chọn đều được chú thích."
     actions:
       title: "Hành động AI"
       description: "Chạy một hành động AI trên văn bản đã chọn. Hành động tùy chỉnh chưa có phím tắt cho đến khi bạn đặt ở đây."
@@ -617,6 +627,14 @@ options:
     enable:
       title: Bật thanh công cụ chọn văn bản
       description: Hiển thị thanh công cụ khi chọn văn bản trên trang web để dịch nhanh, đọc to và dùng các hành động AI
+    annotation:
+      title: "Chú thích từ"
+      enable:
+        title: "Bật"
+        description: "Gạch chân từ hoặc cụm từ đã chọn và ghi nghĩa của nó giữa các dòng"
+      provider:
+        title: "Nhà cung cấp"
+        description: "Tạo ra nghĩa; dùng chung cài đặt với Dịch"
     actions:
       title: Hành động
       translate:
@@ -780,6 +798,8 @@ options:
             unquotedAttributeOutput: Hãy đặt giá trị thuộc tính này trong dấu ngoặc kép, nếu không giá trị có thể thoát ra ngoài thuộc tính.
             filterIgnored: Bộ lọc bị bỏ qua trong thẻ "$1". Hãy gán giá trị đã lọc trước.
             newlineToBrNotLast: newline_to_br chỉ hoạt động khi là bộ lọc cuối cùng của một đầu ra.
+            mathFilterNotLast: $1 chỉ hoạt động khi là bộ lọc cuối cùng của một đầu ra.
+            mathFilterInAttribute: Đừng dùng $1 trong giá trị thuộc tính. Công thức nó vẽ có dấu ngoặc kép, sẽ kết thúc thuộc tính.
             tooLong: Bố cục này dài hơn $1 ký tự và không thể lưu.
             fieldNotShown: '"$1" không được hiển thị trong bố cục này.'
             reservedFieldName: Tên trường "$1" là tên dành riêng trong bố cục. Hãy đổi tên trường.
@@ -814,16 +834,16 @@ options:
           schemaErrorDescription: Hãy thử làm mới lại sau ít phút nữa.
           schemaLoading: Đang tải schema notebase...
           mappingsLabel: Ánh xạ trường
-          mappingsEmpty: Chưa có ánh xạ nào. Hãy thêm một ánh xạ khi bạn sẵn sàng lưu các trường.
-          addMappingAction: Thêm ánh xạ
-          removeMappingAction: Xóa ánh xạ
           localFieldLabel: Trường của hành động
-          localFieldPlaceholder: Chọn một trường của hành động
           remoteFieldLabel: Trường Notebase
-          remoteFieldPlaceholder: Chọn một trường notebase
           columnUnavailableOption: đã xóa
           invalidMappingsTitle: Một số ánh xạ cần được xử lý
           invalidMappingsDescription: Các ánh xạ không hợp lệ vẫn được giữ lại. Hãy sửa chúng trước khi lưu vào Notebase.
+          noFieldSavedTitle: "Không có trường nào được lưu vào Notebase này"
+          noFieldSavedDescription: "Hãy chọn trường Notebase cho ít nhất một trường để lưu ghi chú."
+          mappingSummary: "Lưu $1 · Bỏ qua $2 · Chưa quyết định $3"
+          skipFieldOption: "Không lưu"
+          undecidedFieldPlaceholder: "Chọn một trường Notebase hoặc không lưu"
           mappingMissingLocal: Trường của hành động đã ánh xạ không còn tồn tại.
           mappingMissingRemote: Trường notebase đã ánh xạ không còn tồn tại.
           mappingMissingSchema: Hãy làm mới schema notebase để xác thực ánh xạ này.
@@ -1448,13 +1468,19 @@ options:
       title: Cơ bản
       enable:
         title: Bật phụ đề video
-        description: Thêm nút dịch vào thanh điều khiển của trình phát trên YouTube, X và Netflix.
+        description: Thêm nút dịch vào thanh điều khiển của trình phát trên YouTube, X, Netflix, Bilibili, Udemy và edX.
       autoStart:
         title: Mở video là dịch
         description: Bắt đầu dịch ngay khi video tải xong, không cần bấm nút.
       aiSegmentation:
         title: AI phân đoạn thông minh
-        description: AI cắt lại phụ đề thành những dòng đọc như câu hoàn chỉnh. AI cũng quyết định thời điểm hiện, nên dòng có thể lệch. Cần nhà cung cấp dịch LLM.
+        description: AI cắt lại phụ đề thành từng câu. Bản dịch sẽ phản hồi chậm hơn. Cần LLM mạnh; mô hình yếu có thể bỏ sót hoặc lệch dòng.
+      wordLookupAction:
+        title: Hành động tra từ
+        description: Hành động AI chạy khi bạn nhấp vào một từ trong phụ đề. Mặc định là từ điển, bạn có thể chọn hành động của riêng mình.
+      pauseOnHover:
+        title: Tạm dừng khi di chuột
+        description: Tạm dừng video khi con trỏ dừng trên phụ đề và phát tiếp khi con trỏ rời đi. Nhấp vào một từ để tra luôn tạm dừng video.
     aiQuota:
       title: Hạn mức phụ đề AI
       description: AI dùng công nghệ nhận dạng giọng nói để tạo phụ đề chính xác cho mọi video
@@ -1607,6 +1633,19 @@ translation:
   sameLanguage: Ngôn ngữ nguồn và đích phải khác nhau
   autoModeSameLanguage: Ngôn ngữ phát hiện '$1' giống với ngôn ngữ đích
   extensionContextInvalidated: Tiện ích đã được cập nhật. Hãy tải lại trang này rồi thử lại.
+annotation:
+  annotate: "Chú thích"
+  enterMode: "Chế độ chú thích"
+  exitMode: "Thoát chế độ chú thích"
+  modeLabel: "Chế độ chú thích"
+  noTextSelected: "Chưa chọn văn bản"
+  tooLong: "Hãy chọn một từ hoặc cụm từ ngắn để chú thích"
+  multipleParagraphs: "Hãy chọn văn bản trong cùng một đoạn để chú thích"
+  translatedTextUnsupported: "Không thể chú thích văn bản đã dịch"
+  unsupportedPlace: "Không thể chú thích văn bản ở đây"
+  markOnly: "Đã đánh dấu. Giữa các dòng này không có chỗ cho nghĩa."
+  failed: "Không lấy được nghĩa"
+  remove: "Xóa chú thích"
 speak:
   languageDetectionFallback: Đã chuyển sang phát hiện ngôn ngữ cục bộ
   languageDetectionSettingsHint: Trong Cài đặt, chọn LLM khả dụng hoặc phát hiện cục bộ.
@@ -1632,6 +1671,10 @@ action:
   saveToNotebaseLimitExceeded: Cần nâng cấp để lưu thêm ghi chú Notebase
   saveToNotebaseTableUnavailable: Notebase đã chọn không còn khả dụng
   saveToNotebaseConnectionInvalid: Kết nối Notebase này đã lỗi thời. Hãy làm mới trong Custom AI Actions và sửa các ánh xạ.
+  saveToNotebaseInvalidContent: "Câu trả lời của AI có giá trị sai định dạng nên chưa được lưu. Hãy chạy lại thao tác rồi lưu."
+  saveToNotebaseNoFieldSaved: "Chưa lưu: thao tác này không lưu trường nào vào Notebase. Hãy chọn ít nhất một trường trong phần cài đặt."
+  saveToNotebaseUndecidedTitle: "Đã lưu. Bạn chưa quyết định có lưu các trường này không"
+  saveToNotebaseSkipUndecided: "Không lưu các trường này"
   saveToNotebaseNoMappings: Hãy thêm ít nhất một ánh xạ hợp lệ trước khi lưu
   saveToNotebaseCreateTitle: Tạo Notebase?
   saveToNotebaseCreateDescription: Tạo một Notebase có các cột khớp với Custom Action này, rồi lưu kết quả hiện tại làm ghi chú đầu tiên.
@@ -1702,10 +1745,12 @@ subtitles:
   aiSubtitlesHint: Phụ đề chính xác được tạo bằng công nghệ nhận dạng giọng nói AI tiên tiến, dùng được ngay cả khi không có phụ đề chính thức.
   requestAiSubtitles: Yêu cầu phụ đề AI
   usingAiSubtitles: Đang dùng phụ đề AI
+  settings: Cài đặt phụ đề
   toggle:
     enabled: Đã bật dịch phụ đề
     disabled: Đã tắt dịch phụ đề
   actions:
+    download: Tải phụ đề
     downloadTranslated: Tải phụ đề đã dịch
     downloadTranslatedPreparing: Đang chuẩn bị phụ đề, video dài có thể mất nhiều thời gian hơn
     downloadTranslatedTranslating: Đang dịch phụ đề
@@ -1746,11 +1791,13 @@ subtitles:
     translatedExportIncomplete: Không thể dịch tất cả các dòng phụ đề
     translatedExportSameLanguage: Ngôn ngữ nguồn và ngôn ngữ đích giống nhau
 hostedAi:
-  ultraBadge:
-    tooltip: Yêu cầu gói Ultra · Nhấp vào huy hiệu để nhận gói
+  planBadge:
+    pro: Yêu cầu gói Pro hoặc Ultra · Nhấp vào huy hiệu để nhận gói
+    ultra: Yêu cầu gói Ultra · Nhấp vào huy hiệu để nhận gói
   availability:
     authenticationRequired: Đăng nhập để sử dụng nhà cung cấp này
     ultraRequired: Yêu cầu gói Ultra
+    proRequired: Yêu cầu gói Pro hoặc Ultra
     quotaExhausted: Đã hết hạn mức
     serviceUnavailable: Tạm thời không khả dụng
     usedPercent: "Đã dùng hạn mức: $1%"

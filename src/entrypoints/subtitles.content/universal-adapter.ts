@@ -1,6 +1,7 @@
 import type { ControlsConfig, PlatformConfig } from "@/entrypoints/subtitles.content/platforms"
 import type { FeatureUsageContext, SurfaceByFeature } from "@/types/analytics"
 import type { Config } from "@/types/config/config"
+import type { SubtitlesPlatform } from "@/types/config/subtitles"
 import type { SubtitlesSource } from "@/utils/constants/subtitles"
 import type { SubtitlesFetcher } from "@/utils/subtitles/fetchers/types"
 import type { SubtitlesVideoContext } from "@/utils/subtitles/processor/translator"
@@ -25,7 +26,7 @@ import { i18n } from "@/utils/i18n"
 import { canProviderRefGenerateText } from "@/utils/providers/provider-ref"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
 import { removeReactShadowHost } from "@/utils/react-shadow-host/create-shadow-host"
-import { OverlaySubtitlesError, ToastSubtitlesError } from "@/utils/subtitles/errors"
+import { NoSubtitlesError, ToastSubtitlesError, VideoNotFoundError } from "@/utils/subtitles/errors"
 import { optimizeSubtitles } from "@/utils/subtitles/processor/optimizer"
 import {
   buildSubtitlesSummaryContextHash,
@@ -40,6 +41,7 @@ import {
   adPlayingAtom,
   currentTimeMsAtom,
   currentVideoIdAtom,
+  sourceLanguageAtom,
   sourceTrackAtom,
   translatedTrackAtom,
   videoSummaryPartialAtom,
@@ -49,7 +51,9 @@ import {
   subtitlesSidebarOpenAtom,
   subtitlesSourceAtom,
   subtitlesStore,
+  subtitlesVisibleAtom,
 } from "./atoms"
+import { lookUpAtom } from "./learning/atoms"
 import { renderSubtitlesTranslateButton } from "./renderer/render-translate-button"
 import { SegmentationPipeline } from "./segmentation-pipeline"
 import { SubtitlesScheduler } from "./subtitles-scheduler"
@@ -63,6 +67,18 @@ const TOGGLE_SOURCE_SURFACE: Record<SubtitlesToggleSource, SurfaceByFeature["vid
   manual: ANALYTICS_SURFACE.VIDEO_SUBTITLES,
   auto: ANALYTICS_SURFACE.VIDEO_SUBTITLES_AUTO,
   shortcut: ANALYTICS_SURFACE.SHORTCUT,
+}
+
+/**
+ * Sites where most videos have no captions: auto-start on one of those leaves
+ * no loading pill or error behind, and the toggle falls back to off.
+ */
+const QUIET_AUTO_START_PLATFORMS: ReadonlySet<SubtitlesPlatform> = new Set(["xcom", "bilibili"])
+
+interface SubtitlesStartOptions {
+  analyticsContext?: FeatureUsageContext<"video_subtitles">
+  /** Stay silent when the video has no subtitles; see `QUIET_AUTO_START_PLATFORMS`. */
+  quiet?: boolean
 }
 
 type SubtitlesFetcherFactories = {
@@ -85,6 +101,9 @@ export interface SubtitlesProvidersAdapter {
   hasSubtitlesAvailable: () => Promise<boolean>
   ensureSourceTrackPublished: () => Promise<void>
   seekTo: (seconds: number) => void
+  getVideoElement: () => HTMLVideoElement | null
+  /** The platform's link to the playing video, when the page URL does not name it. */
+  getVideoPageUrl: () => string | null
   toggleSubtitlesManually: (enabled: boolean) => void
   toggleSubtitlesByShortcut: (enabled: boolean) => void
   requestAiSubtitles: () => Promise<void>
@@ -101,6 +120,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   private switchOperationId = 0
   private navigationReinitTimeoutId: ReturnType<typeof setTimeout> | null = null
   private hasPendingNavigationReset = false
+  // Dropped by a newer start, a navigation reset or a leave; it may wait on a start that hangs.
   private trackChangeRefreshPromise: Promise<void> | null = null
   private pendingTranscriptLoads = 0
 
@@ -122,6 +142,16 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   private subtitlesSummaryContextHash: string | null = null
   private adObserver: MutationObserver | null = null
   private observedAdPlayer: HTMLElement | null = null
+  // While an ad plays the player hands out the ad's audio track and caption tokens, so a native
+  // load that overlapped one can fail for the video itself. It gets one more try after the ad.
+  private adOverlappedLoad = false
+  private retryAfterAdOperationId: number | null = null
+  // The start a switch is running: a track check waits for the track it loads.
+  private pendingStart: Promise<boolean> | null = null
+  // Set by destroy(); async work that resumes afterwards backs out instead of touching the page.
+  private destroyed = false
+  // Bumped by a leave and a navigation reset, so an init still waiting on the old player stops.
+  private playerGeneration = 0
 
   get embedded() {
     return this.config.embedded
@@ -162,12 +192,49 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     this.publishVideoId()
     this.initializeTranslatedSubtitlesDownloader()
     void this.restorePosition()
-    void this.renderTranslateButton()
-
-    await this.initializeScheduler()
-    this.setupAdObserver()
-    await this.tryAutoStartSubtitles()
+    await this.attachPlayer()
+    if (this.destroyed) return
     this.setupNavigationListeners()
+  }
+
+  /**
+   * Releases everything the adapter holds on the page. A document that swaps
+   * player layouts (YouTube watch <-> Shorts) builds a new adapter per layout,
+   * so the old one has to give back its DOM, timers, listeners and the shared
+   * atoms before the next one publishes into them. Async work still waiting on
+   * the DOM checks `destroyed` when it resumes and backs out.
+   */
+  destroy() {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.switchOperationId++
+    this.hasPendingNavigationReset = false
+
+    const { events } = this.config
+    if (events.navigateStart) {
+      window.removeEventListener(events.navigateStart, this.handleNavigationStart)
+    }
+    if (events.navigateFinish) {
+      window.removeEventListener(events.navigateFinish, this.handleNavigationFinish)
+    }
+
+    this.clearNavigationReinitTimeout()
+    this.prepareSummaryForNavigation()
+    this.teardownAdObserver()
+    this.translatedSubtitlesDownloader?.dispose()
+    this.translatedSubtitlesDownloader = null
+    this.destroyScheduler()
+    this.clearRuntimeSession()
+    this.clearSourceCache()
+    this.fetcher.cleanup()
+    this.source = SUBTITLES_SOURCE.NATIVE
+    subtitlesStore.set(subtitlesSourceAtom, SUBTITLES_SOURCE.NATIVE)
+    subtitlesStore.set(subtitlesSettingsPanelOpenAtom, false)
+    subtitlesStore.set(subtitlesSettingsPanelViewAtom, ROOT_VIEW)
+    subtitlesStore.set(subtitlesVisibleAtom, false)
+    subtitlesStore.set(translatedTrackAtom, [])
+    this.showNativeSubtitles()
+    this.removeTranslateButton()
   }
 
   getControlsConfig(): ControlsConfig | undefined {
@@ -183,10 +250,13 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   async handleSourceTrackChanged(): Promise<void> {
+    // A navigation that has not reset yet loads the new video's track itself.
+    if (this.destroyed || this.hasPendingNavigationReset) return
     if (!this.trackChangeRefreshPromise) {
-      this.trackChangeRefreshPromise = this.refreshSourceTrackIfNeeded().finally(() => {
-        this.trackChangeRefreshPromise = null
+      const refresh = this.refreshSourceTrackIfNeeded().finally(() => {
+        if (this.trackChangeRefreshPromise === refresh) this.trackChangeRefreshPromise = null
       })
+      this.trackChangeRefreshPromise = refresh
     }
 
     await this.trackChangeRefreshPromise
@@ -258,6 +328,10 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     }
   }
 
+  getVideoElement = () => this.subtitlesScheduler?.getVideoElement() ?? null
+
+  getVideoPageUrl = () => this.config.getVideoPageUrl?.() ?? null
+
   downloadSourceSubtitles = async () => {
     await this.getOrLoadSourceSubtitles()
 
@@ -306,6 +380,9 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
 
   private resetForNavigation() {
     this.switchOperationId++
+    this.playerGeneration++
+    this.pendingStart = null
+    this.trackChangeRefreshPromise = null
     this.prepareSummaryForNavigation()
     // Keyed by video id already; this only stops them accumulating.
     queryClient.removeQueries({ queryKey: VIDEO_SUMMARY_QUERY_SCOPE })
@@ -334,11 +411,14 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private async initializeScheduler() {
+    const generation = this.playerGeneration
     const video = (await waitForElement(
       this.config.selectors.video,
       (el) => !!el.closest(this.config.selectors.playerContainer),
     )) as HTMLVideoElement | null
 
+    // Waited on a player the page has since left or replaced: no scheduler, and nothing missing.
+    if (this.isPlayerSuperseded(generation)) return
     if (!video) {
       toastManager.add({ type: "error", title: i18n.t("subtitles.errors.videoNotFound") })
       return
@@ -373,16 +453,21 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       return this.sourceSubtitles
     }
 
-    const hasSubtitles = await fetcher.hasAvailableSubtitles()
-    assertCurrent()
+    let hasSubtitles: boolean
+    try {
+      hasSubtitles = await fetcher.hasAvailableSubtitles()
+    } finally {
+      // A lookup that failed after its video was left reports as superseded, not as its failure.
+      assertCurrent()
+    }
     if (!hasSubtitles) {
-      throw new OverlaySubtitlesError(i18n.t("subtitles.errors.noSubtitlesFound"))
+      throw new NoSubtitlesError()
     }
 
     const subtitles = await fetcher.fetch()
     assertCurrent()
     if (subtitles.length === 0) {
-      throw new OverlaySubtitlesError(i18n.t("subtitles.errors.noSubtitlesFound"))
+      throw new NoSubtitlesError()
     }
 
     this.sourceVideoId = currentVideoId
@@ -475,6 +560,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   notifyNavigation() {
+    if (this.destroyed) return
     this.hasPendingNavigationReset = true
     this.clearVisibleStateForNavigation()
 
@@ -485,19 +571,52 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     }, NAVIGATION_HANDLER_DELAY)
   }
 
+  /** The page left the player for one with no video: stop its work and start nothing. */
+  notifyLeave() {
+    if (this.destroyed) return
+    this.switchOperationId++
+    this.playerGeneration++
+    this.trackChangeRefreshPromise = null
+    this.hasPendingNavigationReset = false
+    this.clearVisibleStateForNavigation()
+    // No reset follows to drop the session, and a toggle would resume it on a player that is gone.
+    this.clearRuntimeSession()
+    // Its controls may stay hidden or vanish; the next player gets a button of its own.
+    this.removeTranslateButton()
+  }
+
   private async handleNavigation() {
     // A -> B -> A still needs to restore the state torn down at navigation start.
-    if (!this.hasPendingNavigationReset) {
+    if (!this.hasPendingNavigationReset || this.destroyed) {
       return
     }
 
     this.hasPendingNavigationReset = false
     this.resetForNavigation()
-    void this.renderTranslateButton()
+    await this.attachPlayer()
+  }
 
+  private async attachPlayer() {
+    const generation = this.playerGeneration
+    void this.renderTranslateButton()
     await this.initializeScheduler()
+    // Left or reset while it waited: the init that follows the player starts subtitles.
+    if (this.isPlayerSuperseded(generation)) return
     this.setupAdObserver()
     await this.tryAutoStartSubtitles()
+  }
+
+  private removeTranslateButton() {
+    const toggleButton = document.getElementById(TRANSLATE_BUTTON_CONTAINER_ID)
+    if (toggleButton) removeReactShadowHost(toggleButton)
+  }
+
+  private isPlayerSuperseded(generation: number) {
+    return this.destroyed || generation !== this.playerGeneration
+  }
+
+  private isSuperseded(operationId: number) {
+    return this.destroyed || operationId !== this.switchOperationId
   }
 
   private setupAdObserver() {
@@ -547,11 +666,31 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
 
     subtitlesStore.set(adPlayingAtom, playing)
 
-    // Resync content time when the ad ends so the next cue is correct immediately.
-    if (!playing) {
-      this.subtitlesScheduler?.resyncFromVideo()
-      this.translationCoordinator?.requestTick()
+    if (playing) {
+      this.adOverlappedLoad = true
+      return
     }
+
+    // Resync content time when the ad ends so the next cue is correct immediately.
+    this.subtitlesScheduler?.resyncFromVideo()
+    this.translationCoordinator?.requestTick()
+    this.runRetryAfterAd()
+  }
+
+  private runRetryAfterAd() {
+    const operationId = this.retryAfterAdOperationId
+    this.retryAfterAdOperationId = null
+    // Anything newer, or subtitles turned off since, means the failed load no longer stands.
+    if (
+      operationId === null ||
+      operationId !== this.switchOperationId ||
+      this.destroyed ||
+      !this.subtitlesScheduler?.isActive()
+    ) {
+      return
+    }
+
+    void this.switchSubtitlesFetcher(SUBTITLES_SOURCE.NATIVE)
   }
 
   private async renderTranslateButton() {
@@ -560,7 +699,9 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       return
     }
 
+    const generation = this.playerGeneration
     const container = await waitForElement(controlsBar)
+    if (this.isPlayerSuperseded(generation)) return
     if (!container) {
       if (!this.config.embedded) {
         toastManager.add({
@@ -576,7 +717,10 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       removeReactShadowHost(existingButton)
     }
 
-    const toggleButton = renderSubtitlesTranslateButton({ adapter: this })
+    const toggleButton = renderSubtitlesTranslateButton({
+      adapter: this,
+      height: this.config.translateButtonHeight,
+    })
 
     if (this.config.embedded) {
       container.appendChild(toggleButton)
@@ -586,8 +730,10 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private async tryAutoStartSubtitles() {
+    const generation = this.playerGeneration
     const config = await getLocalConfig()
-    const autoStart = config?.videoSubtitles?.autoStart ?? false
+    if (this.isPlayerSuperseded(generation)) return
+    const autoStart = config?.videoSubtitles?.autoStart?.[this.config.platform] ?? false
 
     const learningOpen = subtitlesStore.get(subtitlesSidebarOpenAtom)
 
@@ -614,27 +760,28 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private toggleSubtitlesWithSource(enabled: boolean, source: SubtitlesToggleSource) {
-    this.handleToggleSubtitles(
-      enabled,
-      enabled
+    this.handleToggleSubtitles(enabled, {
+      analyticsContext: enabled
         ? createFeatureUsageContext(
             ANALYTICS_FEATURE.VIDEO_SUBTITLES,
             TOGGLE_SOURCE_SURFACE[source],
           )
         : undefined,
-    )
+      // Only an automatic start goes quiet: a reader who asked still hears why nothing came.
+      quiet: source === "auto" && QUIET_AUTO_START_PLATFORMS.has(this.config.platform),
+    })
   }
 
-  private handleToggleSubtitles(
-    enabled: boolean,
-    analyticsContext?: FeatureUsageContext<"video_subtitles">,
-  ) {
+  private handleToggleSubtitles(enabled: boolean, options: SubtitlesStartOptions = {}) {
     if (enabled) {
-      void this.switchSubtitlesFetcher(SUBTITLES_SOURCE.NATIVE, analyticsContext)
+      void this.switchSubtitlesFetcher(SUBTITLES_SOURCE.NATIVE, options)
     } else {
       this.subtitlesScheduler?.hide()
       this.showNativeSubtitles()
       this.translationCoordinator?.stop()
+      // Nothing waits on a start the reader turned off: it may never settle.
+      this.pendingStart = null
+      this.trackChangeRefreshPromise = null
     }
   }
 
@@ -648,14 +795,15 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
 
   private async switchSubtitlesFetcher(
     next: SubtitlesSource,
-    analyticsContext?: FeatureUsageContext<"video_subtitles">,
+    options: SubtitlesStartOptions = {},
   ): Promise<void> {
     const make = this.fetchers[next]
-    if (!make) {
+    if (!make || this.destroyed) {
       return
     }
 
     const operationId = ++this.switchOperationId
+    this.trackChangeRefreshPromise = null
 
     if (next !== this.source) {
       this.fetcher.cleanup()
@@ -664,6 +812,18 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       this.fetcher = make()
       this.clearSourceCache()
       this.clearRuntimeSession()
+    }
+
+    // Showing first would flash the toggle ON on every captionless video.
+    if (options.quiet) {
+      // Nobody asked for an automatic start, so one that cannot reach the video stays quiet too.
+      const hasSubtitles = await this.fetcher.hasAvailableSubtitles().catch(() => false)
+      // The check can wait seconds for cues; a toggle or a navigation since then starts its own.
+      if (this.isSuperseded(operationId) || this.hasPendingNavigationReset) return
+      if (!hasSubtitles) {
+        this.handleToggleSubtitles(false)
+        return
+      }
     }
 
     this.subtitlesScheduler?.start()
@@ -675,7 +835,10 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       this.subtitlesScheduler?.setState("loading", { message })
     }
 
-    const succeeded = await this.startTranslation(analyticsContext)
+    const start = this.startTranslation(options)
+    this.pendingStart = start
+    const succeeded = await start
+    if (this.pendingStart === start) this.pendingStart = null
     if (operationId !== this.switchOperationId) {
       return
     }
@@ -685,6 +848,8 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private revertToNativeSource() {
+    // A track check that waited on the failed start would lay a session over the native captions.
+    this.switchOperationId++
     this.fetcher.cleanup()
     this.source = SUBTITLES_SOURCE.NATIVE
     this.fetcher = this.fetchers.native()
@@ -695,6 +860,13 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private async refreshSourceTrackIfNeeded(): Promise<void> {
+    const checkOperationId = this.switchOperationId
+    // A newer start, navigation reset or leave loads the current track itself, so this check stops.
+    const isOvertaken = () => this.isSuperseded(checkOperationId) || this.hasPendingNavigationReset
+    // A running start loads the current track, so a switch is checked against what it loaded.
+    while (this.pendingStart && !isOvertaken()) await this.pendingStart
+    if (isOvertaken()) return
+
     const scheduler = this.subtitlesScheduler
     const isSchedulerActive = !!scheduler?.isActive()
 
@@ -705,9 +877,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     }
 
     const useSameTrack = await this.fetcher.shouldUseSameTrack()
-    if (useSameTrack) {
-      return
-    }
+    if (useSameTrack || isOvertaken()) return
 
     if (!scheduler || !isSchedulerActive) {
       const operationId = ++this.switchOperationId
@@ -734,6 +904,8 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
   }
 
   private showNativeSubtitles() {
+    // Our subtitles step aside, and a word lookup on them goes too.
+    subtitlesStore.set(lookUpAtom, null)
     this.fetcher.showNativeSubtitles?.()
     if (!this.isNativeSubtitlesHidden) {
       return
@@ -769,12 +941,17 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     this.isNativeSubtitlesHidden = true
   }
 
-  private async startTranslation(analyticsContext?: FeatureUsageContext<"video_subtitles">) {
+  private async startTranslation({ analyticsContext, quiet = false }: SubtitlesStartOptions = {}) {
     let providerAnalytics = UNKNOWN_FEATURE_PROVIDER
     let targetLanguage: Config["language"]["targetCode"] | undefined
+    const operationId = this.switchOperationId
+    this.adOverlappedLoad = subtitlesStore.get(adPlayingAtom)
+    // Only the caption load is what an ad can break; a failure after it is the translation's own.
+    let loadingSource = false
 
     try {
       const analyticsConfig = await getLocalConfig()
+      if (this.destroyed) return false
       targetLanguage = analyticsConfig?.language.targetCode
       // Resolve through the capability registry, not providersConfig: Built-in
       // AI is synthesized by the registry and is never a row there, so the
@@ -823,15 +1000,23 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       this.sessionVideoId = currentVideoId
       this.subtitlesScheduler?.reset()
 
-      this.subtitlesScheduler?.setState("loading", { message: LOADING_MESSAGE[this.source] })
+      // A quiet start stays invisible until there is something to show.
+      if (!quiet) {
+        this.subtitlesScheduler?.setState("loading", { message: LOADING_MESSAGE[this.source] })
+      }
 
+      loadingSource = true
       await this.getOrLoadSourceSubtitles()
+      loadingSource = false
+      // A newer start, a navigation reset or a leave has superseded this one since it began.
+      if (this.isSuperseded(operationId)) return false
       this.sessionSubtitles = this.sourceSubtitles
 
       if (this.shouldSkipTranslationForCurrentTrack(analyticsConfig)) {
         this.processPassthroughSubtitles()
       } else {
         await this.processTranslatedSubtitles(analyticsConfig)
+        if (this.isSuperseded(operationId)) return false
       }
       if (analyticsContext && targetLanguage) {
         void trackFeatureUsed({
@@ -843,6 +1028,15 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       }
       return true
     } catch (error) {
+      // Not a failure: the video has none, or an automatic start lost it. Skipping analytics
+      // too, since on a quiet site this is most videos and nothing actually ran.
+      if (quiet && (error instanceof NoSubtitlesError || error instanceof VideoNotFoundError)) {
+        if (operationId === this.switchOperationId) {
+          this.handleToggleSubtitles(false)
+        }
+        return false
+      }
+
       if (analyticsContext && targetLanguage) {
         void trackFeatureUsed({
           ...analyticsContext,
@@ -858,6 +1052,21 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       // "Aborted", which would otherwise be painted onto the player untranslated.
       if (error instanceof DOMException && error.name === "AbortError") {
         return false
+      }
+
+      // A superseded load failing late must not take the retry slot from the current one.
+      if (
+        loadingSource &&
+        operationId === this.switchOperationId &&
+        this.source === SUBTITLES_SOURCE.NATIVE &&
+        this.adOverlappedLoad
+      ) {
+        this.retryAfterAdOperationId = operationId
+        // The ad already ended while this load was running, so retry now instead of reporting.
+        if (!subtitlesStore.get(adPlayingAtom)) {
+          this.runRetryAfterAd()
+          return false
+        }
       }
 
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -911,6 +1120,10 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
       subtitlesStore.set(currentTimeMsAtom, video.currentTime * 1000)
     }
     subtitlesStore.set(sourceTrackAtom, [...fragments])
+    subtitlesStore.set(
+      sourceLanguageAtom,
+      resolveLanguageCodeFromLocale(this.fetcher.getSourceLanguage()),
+    )
   }
 
   private replaceSourceTrackWindow(
@@ -934,7 +1147,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
 
     const useAiSegmentation = !!config?.videoSubtitles?.aiSegmentation
 
-    this.sessionProcessedFragments = [...this.sourceProcessedSubtitles]
+    const sessionFragments = [...this.sourceProcessedSubtitles]
 
     // Source track for display fallback; scheduler only receives translated cues
     // later. Published before the provider resolve below, which none of this
@@ -943,7 +1156,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     // flow — so sequencing it second made the original captions wait on a round
     // trip they never needed, and a hung request (backgroundFetch carries no
     // timeout) left the player in "loading" showing nothing at all.
-    this.publishSourceTrack(this.sessionProcessedFragments)
+    this.publishSourceTrack(sessionFragments)
 
     // Resolved once per session; the cache key needs the same identity the
     // background will use, and a hosted ref costs one status fetch here rather
@@ -951,7 +1164,11 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
     // and the summary are generations, so a translate-only provider keeps the
     // rule-based recut and skips the summary without a doomed prompt attempt
     // per look-ahead window.
+    const operationId = this.switchOperationId
     const providerRef = config ? await resolveSubtitlesProviderRef(config, "lineTranslation") : null
+    // Superseded: the session stays unclaimed, or a newer start would resume it untranslated.
+    if (this.isSuperseded(operationId)) return
+    this.sessionProcessedFragments = sessionFragments
     const promptableProviderRef =
       providerRef && canProviderRefGenerateText(providerRef) ? providerRef : null
 

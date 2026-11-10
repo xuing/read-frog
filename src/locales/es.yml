@@ -115,6 +115,7 @@ options:
     product: Producto
   tools:
     translationHub: Centro de traducción
+    pdfTranslation: Traducción de PDF
   product:
     roadmap: Hoja de ruta
   helpAndCommunity:
@@ -157,6 +158,8 @@ options:
       resetsAt: "Se restablece el $1"
       daily: Cuota diaria
       weekly: Cuota semanal
+      oneTime: Crédito de regalo
+      expiresAt: "Caduca el $1"
       features:
         pageTranslation: Traducción de página
         customAction: Acciones de IA personalizadas
@@ -165,14 +168,15 @@ options:
         videoSubtitles: Subtítulos de video
         inputTranslation: Traducción de entrada
         languageDetection: Detección de idioma
+        pdfTranslation: Traducción de PDF
     sponsorCta: Obtén IA rápida y rentable
-    sponsorCtaJalapenoCloud: Obtén un 50 % de descuento en GLM 5.2
+    sponsorCtaJalapenoCloud: Obtén un 50 % de descuento en GLM 5.3
     setApiKeyWarning:
       message: Configura tu clave de API en la página $1
     badges:
       featureCount: $1 funciones
       sponsor: Patrocinador
-      sponsorJalapenoCloud: $$2 gratis
+      sponsorJalapenoCloud: $$1 gratis
     dialog:
       title: Añadir nuevo proveedor
       groups:
@@ -252,7 +256,7 @@ options:
         customChatComplete: Personalizado Chat Complete
         customResponses: Personalizado Responses
       attribution:
-        builtInAi: Modelo estándar alojado por Read Frog. Los usuarios sin Ultra solo pueden usarlo en las acciones de IA personalizadas; los usuarios Ultra pueden usarlo en más funciones.
+        builtInAi: Modelo estándar alojado por Read Frog. Los usuarios Pro y Ultra pueden usarlo en todas las funciones con una cuota semanal; en el plan gratuito solo funciona en las acciones de IA personalizadas.
         builtInAiAdvance: Modelo avanzado alojado por Read Frog, exclusivo para miembros Ultra. Funciona en todas las funciones de IA integrada — traducción de página, acciones de IA personalizadas y más — con una cuota semanal compartida. Consume la cuota más rápido que el modelo estándar.
       description:
         openai: Proporciona modelos como GPT-4o
@@ -308,7 +312,7 @@ options:
         noteSuggestion: Sugerencias de notas
       descriptions:
         pageTranslation: Traduce la página completa en modo bilingüe o de reemplazo.
-        selectionTranslation: Traduce el texto que seleccionas desde la barra de selección.
+        selectionTranslation: "Traduce el texto que seleccionas; también da el significado de las anotaciones."
         inputTranslation: Traduce lo que escribes en un campo de texto antes de enviarlo.
         videoSubtitles: Traduce los subtítulos que aparecen en el reproductor de video.
         noteSuggestion: Sugiere palabras que vale la pena guardar en tu Notebase después de traducir una selección.
@@ -546,6 +550,12 @@ options:
     selectionSpeak:
       title: "Leer la selección en voz alta"
       description: "Lee en voz alta el texto seleccionado. Vuelve a pulsar para detener."
+    selectionAnnotation:
+      title: "Anotar"
+      description: "Subraya el texto seleccionado y escribe su significado entre las líneas."
+    selectionAnnotationMode:
+      title: "Modo de anotación"
+      description: "Activa o desactiva el modo de anotación sin abrir la barra. Mientras está activo, se anota cualquier texto que selecciones."
     actions:
       title: "Acciones AI"
       description: "Ejecuta una acción AI sobre el texto seleccionado. Las acciones personalizadas no tienen atajo hasta que les asignes uno aquí."
@@ -618,6 +628,14 @@ options:
     enable:
       title: Activar barra de selección
       description: Muestra la barra de herramientas al seleccionar texto en páginas web para traducción rápida, voz y acciones AI
+    annotation:
+      title: "Anotación de palabras"
+      enable:
+        title: "Activar"
+        description: "Subraya la palabra o frase seleccionada y escribe su significado entre las líneas"
+      provider:
+        title: "Proveedor"
+        description: "Genera el significado; es el mismo ajuste que Traducir"
     actions:
       title: Acciones
       translate:
@@ -781,6 +799,8 @@ options:
             unquotedAttributeOutput: Pon comillas alrededor de este valor de atributo, o el valor podría salirse de él.
             filterIgnored: Los filtros se ignoran en una etiqueta «$1». Asigna primero el valor filtrado.
             newlineToBrNotLast: newline_to_br solo funciona como último filtro de una salida.
+            mathFilterNotLast: $1 solo funciona como último filtro de una salida.
+            mathFilterInAttribute: No uses $1 dentro de un valor de atributo. Las fórmulas que dibuja llevan comillas, que cierran el atributo.
             tooLong: Este diseño supera los $1 caracteres y no se puede guardar.
             fieldNotShown: «$1» no aparece en este diseño.
             reservedFieldName: El nombre de campo «$1» está reservado en los diseños. Cambia el nombre del campo.
@@ -815,16 +835,16 @@ options:
           schemaErrorDescription: Intenta actualizar el esquema de nuevo en un momento.
           schemaLoading: Cargando esquema de la Notebase...
           mappingsLabel: Asignaciones de campos
-          mappingsEmpty: Aún no hay asignaciones. Añade una cuando estés listo para guardar campos.
-          addMappingAction: Añadir asignación
-          removeMappingAction: Eliminar asignación
           localFieldLabel: Campo de acción
-          localFieldPlaceholder: Selecciona un campo de acción
           remoteFieldLabel: Campo de Notebase
-          remoteFieldPlaceholder: Selecciona un campo de Notebase
           columnUnavailableOption: eliminado
           invalidMappingsTitle: Algunas asignaciones requieren atención
           invalidMappingsDescription: Las asignaciones no válidas se conservan. Corrígelas antes de guardar en Notebase.
+          noFieldSavedTitle: "Ningún campo se guarda en esta Notebase"
+          noFieldSavedDescription: "Elige un campo de Notebase para al menos un campo y así poder guardar notas."
+          mappingSummary: "Se guardan $1 · Omitidos $2 · Sin decidir $3"
+          skipFieldOption: "No guardar"
+          undecidedFieldPlaceholder: "Elige un campo de Notebase o no guardar"
           mappingMissingLocal: El campo de acción asignado ya no existe.
           mappingMissingRemote: El campo de Notebase asignado ya no existe.
           mappingMissingSchema: Actualiza el esquema de la Notebase para validar esta asignación.
@@ -1453,13 +1473,19 @@ options:
       title: Aspectos básicos
       enable:
         title: Activar subtítulos de video
-        description: Añade un botón de traducción a los controles del reproductor en YouTube, X y Netflix.
+        description: Añade un botón de traducción a los controles del reproductor en YouTube, X, Netflix, Bilibili, Udemy y edX.
       autoStart:
         title: Traducir al abrir el video
         description: Empieza a traducir en cuanto se carga el video, sin pulsar el botón.
       aiSegmentation:
         title: Segmentación inteligente de IA
-        description: La IA vuelve a cortar los subtítulos en líneas que se leen como frases. También fija sus tiempos, así que pueden desajustarse. Requiere un proveedor de traducción LLM.
+        description: La IA vuelve a cortar los subtítulos en frases. Las traducciones tardan más. Requiere un LLM potente; los modelos más débiles pueden omitir o desalinear líneas.
+      wordLookupAction:
+        title: Acción al buscar una palabra
+        description: La acción de IA que responde al hacer clic en una palabra de los subtítulos. Diccionario, salvo que elijas una tuya.
+      pauseOnHover:
+        title: Pausar al pasar el cursor
+        description: Pausa el vídeo mientras el puntero se detiene sobre los subtítulos y lo reanuda al apartarlo. Hacer clic en una palabra para buscarla siempre pausa.
     aiQuota:
       title: Cuota de subtítulos con IA
       description: El reconocimiento de voz con IA te da subtítulos precisos para cualquier vídeo
@@ -1612,6 +1638,19 @@ translation:
   sameLanguage: Los idiomas de origen y destino deben ser diferentes
   autoModeSameLanguage: El idioma detectado '$1' es el mismo que el idioma de destino
   extensionContextInvalidated: La extensión se actualizó. Actualiza esta página e inténtalo de nuevo.
+annotation:
+  annotate: "Anotar"
+  enterMode: "Modo de anotación"
+  exitMode: "Salir del modo de anotación"
+  modeLabel: "Modo de anotación"
+  noTextSelected: "No hay texto seleccionado"
+  tooLong: "Selecciona una palabra o una frase corta para anotarla"
+  multipleParagraphs: "Selecciona texto dentro de un solo párrafo para anotarlo"
+  translatedTextUnsupported: "El texto traducido no se puede anotar"
+  unsupportedPlace: "Este texto no se puede anotar aquí"
+  markOnly: "Marcado. No hay espacio entre estas líneas para su significado."
+  failed: "No se pudo obtener el significado"
+  remove: "Quitar anotación"
 speak:
   languageDetectionFallback: Se usa la detección local de idioma
   languageDetectionSettingsHint: En Ajustes, elige un LLM disponible o la detección local.
@@ -1637,6 +1676,10 @@ action:
   saveToNotebaseLimitExceeded: Se requiere una mejora para guardar más notas de Notebase
   saveToNotebaseTableUnavailable: La Notebase seleccionada ya no está disponible
   saveToNotebaseConnectionInvalid: Esta conexión de Notebase está desactualizada. Actualízala en Acciones AI personalizadas y corrige las asignaciones.
+  saveToNotebaseInvalidContent: "La respuesta de la IA tiene un valor con un formato incorrecto, así que no se guardó. Vuelve a ejecutar la acción y luego guarda."
+  saveToNotebaseNoFieldSaved: "No se guardó: esta acción no guarda ningún campo en la Notebase. Elige al menos uno en su configuración."
+  saveToNotebaseUndecidedTitle: "Guardado. Aún no has decidido si guardar estos campos"
+  saveToNotebaseSkipUndecided: "No guardarlos"
   saveToNotebaseNoMappings: Añade al menos una asignación válida antes de guardar
   saveToNotebaseCreateTitle: ¿Crear una Notebase?
   saveToNotebaseCreateDescription: Crea una Notebase con columnas que coinciden con esta acción personalizada y guarda este resultado como la primera nota.
@@ -1707,10 +1750,12 @@ subtitles:
   aiSubtitlesHint: Subtítulos precisos generados por reconocimiento de voz con IA avanzada, disponibles incluso sin subtítulos oficiales.
   requestAiSubtitles: Solicitar subtítulos con IA
   usingAiSubtitles: Usando subtítulos con IA
+  settings: Ajustes de subtítulos
   toggle:
     enabled: Traducción de subtítulos activada
     disabled: Traducción de subtítulos desactivada
   actions:
+    download: Descargar subtítulos
     downloadTranslated: Descargar subtítulos traducidos
     downloadTranslatedPreparing: Preparando subtítulos, los videos largos pueden tardar más
     downloadTranslatedTranslating: Traduciendo subtítulos
@@ -1751,11 +1796,13 @@ subtitles:
     translatedExportIncomplete: No se pudieron traducir todas las líneas de subtítulos
     translatedExportSameLanguage: El idioma de origen y el de destino son iguales
 hostedAi:
-  ultraBadge:
-    tooltip: Requiere el plan Ultra · Haz clic en la insignia para obtenerlo
+  planBadge:
+    pro: Requiere el plan Pro o Ultra · Haz clic en la insignia para obtenerlo
+    ultra: Requiere el plan Ultra · Haz clic en la insignia para obtenerlo
   availability:
     authenticationRequired: Inicia sesión para usar este proveedor
     ultraRequired: Se requiere el plan Ultra
+    proRequired: Se requiere el plan Pro o Ultra
     quotaExhausted: Cuota agotada
     serviceUnavailable: No disponible temporalmente
     usedPercent: "Cuota utilizada: $1%"

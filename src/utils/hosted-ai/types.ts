@@ -5,10 +5,14 @@ import type { HostedAiStatusOutput } from "@read-frog/api-contract"
 // erased at build, so no zod code reaches content scripts through this path.
 export type {
   HostedAiCreditPeriodKind,
-  HostedAiCreditStatus,
+  HostedAiCreditPoolStatus,
   HostedAiFeature,
+  HostedAiFeatureStatus,
+  HostedAiOneTimeCreditStatus,
+  HostedAiRecurringCreditStatus,
   HostedAiTierStatus,
   HostedAiUnavailableReason,
+  HostedAiUpgradePlan,
 } from "@read-frog/api-contract"
 
 export type HostedAiStatus = HostedAiStatusOutput

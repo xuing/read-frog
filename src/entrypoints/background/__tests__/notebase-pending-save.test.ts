@@ -316,6 +316,7 @@ describe("notebase pending save processor", () => {
       { surface: "custom_action", isGuide: false },
     )
     expect(loggedInDeps.reportNoteSave).toHaveBeenCalledExactlyOnceWith({
+      surface: "selection_toolbar",
       saveSource: "custom_action",
       isGuide: false,
       noteCount: 1,
@@ -462,6 +463,33 @@ describe("notebase pending save processor", () => {
     expect(deps.openNotebasePage).toHaveBeenCalledWith("notebase-1")
   })
 
+  it("keeps fields set to don't save after the click when it refreshes the connection", async () => {
+    const { action, config } = createConnectedBuiltInDictionaryConfig()
+    const [field, skipped] = action.outputSchema
+    const pending = createPendingConnectedNotebaseSave(
+      action,
+      action.notebaseConnection!,
+      [{ [field!.name]: "frog" }],
+      1_000,
+    )
+    // While the save waits for login, the reader marks a field "don't save".
+    const { builtInActions } = config.selectionToolbar
+    builtInActions.dictionary.notebaseConnection = {
+      ...builtInActions.dictionary.notebaseConnection!,
+      skippedFieldIds: [skipped!.id],
+    }
+    const deps = createDeps({ pending, config, authenticated: true })
+    deps.getSchema.mockResolvedValueOnce(createBuiltInConnectedSchema(action))
+
+    await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+    expect(deps.createRow).toHaveBeenCalledTimes(1)
+    const nextConfig = deps.setConfig.mock.calls[0]?.[0] as Config
+    expect(
+      nextConfig.selectionToolbar.builtInActions.dictionary.notebaseConnection?.skippedFieldIds,
+    ).toEqual([skipped!.id])
+  })
+
   it("completes the guide Dictionary Notebase flow after connected pending row resume when guide metadata is present", async () => {
     const { action, config } = createConnectedBuiltInDictionaryConfig()
     const field = action.outputSchema[0]!
@@ -597,12 +625,32 @@ describe("notebase pending save processor", () => {
       isGuide: false,
     })
     expect(deps.reportNoteSave).toHaveBeenCalledExactlyOnceWith({
+      surface: "selection_toolbar",
       saveSource: "note_suggestion",
       isGuide: false,
       noteCount: 2,
       path: "after_login",
       startedAt: 1_000,
     })
+  })
+
+  it("reports a save started from video subtitles under that surface after login", async () => {
+    const action = createConnectedAction()
+    const pending = createPendingConnectedNotebaseSave(
+      action,
+      action.notebaseConnection!,
+      [{ summary: "First" }],
+      1_000,
+      { analyticsSurface: "video_subtitles" },
+    )
+    const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+    deps.getSchema.mockResolvedValueOnce(createConnectedSchema())
+
+    await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+    expect(deps.reportNoteSave).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ surface: "video_subtitles", path: "after_login" }),
+    )
   })
 
   it("reports a pending save dropped for an error retrying cannot fix", async () => {
@@ -666,6 +714,27 @@ describe("notebase pending save processor", () => {
     )
   })
 
+  it("drops a connected pending save the server rejects a cell of without opening the mappings", async () => {
+    const action = createConnectedAction()
+    const pending = createPendingConnectedNotebaseSave(
+      action,
+      action.notebaseConnection!,
+      [{ summary: "A short summary" }],
+      1_000,
+    )
+    const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+    deps.getSchema.mockResolvedValue(createConnectedSchema())
+    deps.createRow.mockRejectedValue(new ORPCError("CELL_VALIDATION_FAILED", { status: 422 }))
+
+    await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+    expect(deps.clearPendingNotebaseSave).toHaveBeenCalledTimes(1)
+    expect(deps.openActionOptions).not.toHaveBeenCalled()
+    expect(deps.reportNoteSave).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ path: "after_login", failureReason: "validation" }),
+    )
+  })
+
   it("reports a rejected connected row only once its pending save is cleared", async () => {
     const action = createConnectedAction()
     const pending = createPendingConnectedNotebaseSave(
@@ -700,5 +769,127 @@ describe("notebase pending save processor", () => {
 
     expect(deps.clearPendingNotebaseSave).not.toHaveBeenCalled()
     expect(deps.reportNoteSave).not.toHaveBeenCalled()
+  })
+
+  describe("note origin", () => {
+    const origin = {
+      kind: "webpage",
+      url: "https://example.com/article",
+      title: "An article",
+    } as const
+
+    it("puts the origin on a new Notebase's first note", async () => {
+      const action = createAction()
+      const pending = createPendingNotebaseSave(action, [{ summary: "A short summary" }], 1_000, {
+        origin,
+      })
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      const input = deps.createNotebase.mock.calls[0]?.[0]
+      expect(input.options.initialRow).toEqual({
+        id: pending.rows[0]!.id,
+        cells: pending.rows[0]!.cells,
+        origin,
+      })
+    })
+
+    it("puts the origin on each of a new Notebase's first notes", async () => {
+      const action = createAction()
+      const pending = createPendingNotebaseSave(
+        action,
+        [{ summary: "First" }, { summary: "Second" }],
+        1_000,
+        { origin },
+      )
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      const input = deps.createNotebase.mock.calls[0]?.[0]
+      expect(input.options.initialRows).toHaveLength(2)
+      for (const row of input.options.initialRows) {
+        expect(row.origin).toEqual(origin)
+      }
+    })
+
+    it("puts the origin on a connected pending row", async () => {
+      const action = createConnectedAction()
+      const pending = createPendingConnectedNotebaseSave(
+        action,
+        action.notebaseConnection!,
+        [{ summary: "A short summary" }],
+        1_000,
+        { origin },
+      )
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+      deps.getSchema.mockResolvedValueOnce(createConnectedSchema())
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      expect(deps.createRow).toHaveBeenCalledWith(
+        {
+          notebaseId: "notebase-1",
+          data: { cells: { "column-summary": "A short summary" }, origin },
+        },
+        { surface: "custom_action", isGuide: false },
+      )
+    })
+
+    it("puts the origin on every connected pending row", async () => {
+      const action = createConnectedAction()
+      const pending = createPendingConnectedNotebaseSave(
+        action,
+        action.notebaseConnection!,
+        [{ summary: "First" }, { summary: "Second" }],
+        1_000,
+        { origin },
+      )
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+      deps.getSchema.mockResolvedValueOnce(createConnectedSchema())
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      expect(deps.createRows).toHaveBeenCalledWith(
+        {
+          notebaseId: "notebase-1",
+          rows: [
+            { cells: { "column-summary": "First" }, origin },
+            { cells: { "column-summary": "Second" }, origin },
+          ],
+        },
+        { surface: "custom_action", isGuide: false },
+      )
+    })
+
+    it("keeps the origin when a connected save falls back to a replacement Notebase", async () => {
+      const action = createConnectedAction()
+      const pending = createPendingConnectedNotebaseSave(
+        action,
+        action.notebaseConnection!,
+        [{ summary: "A short summary" }],
+        1_000,
+        { origin },
+      )
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+      deps.listNotebases.mockResolvedValueOnce([])
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      const input = deps.createNotebase.mock.calls[0]?.[0]
+      expect(input.options.initialRow.origin).toEqual(origin)
+    })
+
+    it("sends no origin when the save has none", async () => {
+      const action = createAction()
+      const pending = createPendingNotebaseSave(action, [{ summary: "A short summary" }], 1_000)
+      const deps = createDeps({ pending, config: createConfig(action), authenticated: true })
+
+      await createNotebasePendingSaveProcessor(deps)("auth-cookie-change")
+
+      const input = deps.createNotebase.mock.calls[0]?.[0]
+      expect(input.options.initialRow).not.toHaveProperty("origin")
+    })
   })
 })

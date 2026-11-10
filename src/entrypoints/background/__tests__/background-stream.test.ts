@@ -460,7 +460,7 @@ describe("background-stream", () => {
         message: "hostedAi.availability.quotaExhausted",
         action: {
           label: "action.upgrade",
-          url: new URL("/pricing", env.WXT_WEBSITE_URL).toString(),
+          url: new URL("/pricing?entry=extension_quota_exhausted", env.WXT_WEBSITE_URL).toString(),
         },
         // Classified in the background, where the hosted-AI error code still exists.
         reason: "quota_exceeded",
@@ -528,6 +528,37 @@ describe("background-stream", () => {
       ).toEqual({ action: "fail", failQueue: true })
     },
   )
+
+  it.each([
+    { upgradeTo: "pro", messageKey: "hostedAi.availability.proRequired" },
+    { upgradeTo: "ultra", messageKey: "hostedAi.availability.ultraRequired" },
+    // A server that predates `upgradeTo` only walls behind Ultra.
+    { upgradeTo: undefined, messageKey: "hostedAi.availability.ultraRequired" },
+  ])("names the plan a tier wall asks for ($upgradeTo)", async ({ upgradeTo, messageKey }) => {
+    hostedStreamStructuredObjectMock.mockResolvedValue(
+      (async function* () {
+        yield { type: "start" }
+        throw Object.assign(new Error("denied"), {
+          code: "HOSTED_AI_TIER_RESTRICTED",
+          status: 403,
+          data: upgradeTo ? { modelTier: "normal", upgradeTo } : { modelTier: "normal" },
+        })
+      })(),
+    )
+
+    const { runStructuredObjectStreamInBackground } = await import("../background-stream")
+
+    await expect(
+      runStructuredObjectStreamInBackground({
+        providerId: "read-frog-free-ai",
+        modelTier: "normal",
+        requestId: "123e4567-e89b-42d3-a456-426614174003",
+        instructions: "Return structured data",
+        prompt: "Analyze selection",
+        outputSchema: [{ name: "score", type: "number" }],
+      }),
+    ).rejects.toThrow(messageKey)
+  })
 
   // Denials arrive two ways and they are normalized by different code. Failing
   // to open the stream lands in each path's own `catch` around

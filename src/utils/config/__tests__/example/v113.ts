@@ -5,9 +5,8 @@ import type { TestSeriesObject } from "./types"
  * spreads the previous version is not a snapshot, because editing v112 would
  * silently change what v113 asserts.
  *
- * Delta from v112: `tts` gains `provider: "edge-tts"` and a `gemini` block
- * (every series has an enabled "google-default" provider, which is
- * preselected; the default Gemini TTS model and voice; no voice style).
+ * Delta from v112: `videoSubtitles.autoStart` becomes one switch per
+ * platform. Every series had it off, so every platform is off.
  */
 
 export const testSeries: TestSeriesObject = {
@@ -167,13 +166,6 @@ export const testSeries: TestSeriesObject = {
         },
       },
       tts: {
-        provider: "edge-tts",
-        gemini: {
-          providerId: "google-default",
-          model: "gemini-3.8-flash-lite-tts",
-          voice: "kore",
-          style: "",
-        },
         defaultVoice: "en-US-GuyNeural",
         languageVoices: {
           eng: "en-US-GuyNeural",
@@ -426,7 +418,11 @@ export const testSeries: TestSeriesObject = {
       },
       videoSubtitles: {
         enabled: false,
-        autoStart: false,
+        autoStart: {
+          youtube: false,
+          xcom: false,
+          netflix: false,
+        },
         providerId: "openai-default",
         style: {
           displayMode: "bilingual",
@@ -590,13 +586,6 @@ export const testSeries: TestSeriesObject = {
         },
       },
       tts: {
-        provider: "edge-tts",
-        gemini: {
-          providerId: "google-default",
-          model: "gemini-3.8-flash-lite-tts",
-          voice: "kore",
-          style: "",
-        },
         defaultVoice: "en-US-GuyNeural",
         languageVoices: {
           eng: "en-US-GuyNeural",
@@ -849,7 +838,11 @@ export const testSeries: TestSeriesObject = {
       },
       videoSubtitles: {
         enabled: false,
-        autoStart: false,
+        autoStart: {
+          youtube: false,
+          xcom: false,
+          netflix: false,
+        },
         providerId: "google-default",
         style: {
           displayMode: "bilingual",
@@ -1022,13 +1015,6 @@ export const testSeries: TestSeriesObject = {
         },
       },
       tts: {
-        provider: "edge-tts",
-        gemini: {
-          providerId: "google-default",
-          model: "gemini-3.8-flash-lite-tts",
-          voice: "kore",
-          style: "",
-        },
         defaultVoice: "en-US-GuyNeural",
         languageVoices: {
           eng: "en-US-GuyNeural",
@@ -1366,7 +1352,11 @@ export const testSeries: TestSeriesObject = {
       },
       videoSubtitles: {
         enabled: false,
-        autoStart: false,
+        autoStart: {
+          youtube: false,
+          xcom: false,
+          netflix: false,
+        },
         providerId: "google-default",
         style: {
           displayMode: "bilingual",
@@ -1538,13 +1528,6 @@ export const testSeries: TestSeriesObject = {
         },
       },
       tts: {
-        provider: "edge-tts",
-        gemini: {
-          providerId: "google-default",
-          model: "gemini-3.8-flash-lite-tts",
-          voice: "kore",
-          style: "",
-        },
         defaultVoice: "en-US-GuyNeural",
         languageVoices: {
           eng: "en-US-GuyNeural",
@@ -1797,7 +1780,11 @@ export const testSeries: TestSeriesObject = {
       },
       videoSubtitles: {
         enabled: false,
-        autoStart: false,
+        autoStart: {
+          youtube: false,
+          xcom: false,
+          netflix: false,
+        },
         providerId: "google-default",
         style: {
           displayMode: "bilingual",
@@ -1961,13 +1948,6 @@ export const testSeries: TestSeriesObject = {
         },
       },
       tts: {
-        provider: "edge-tts",
-        gemini: {
-          providerId: "google-default",
-          model: "gemini-3.8-flash-lite-tts",
-          voice: "kore",
-          style: "",
-        },
         defaultVoice: "en-US-GuyNeural",
         languageVoices: {
           eng: "en-US-GuyNeural",
@@ -2275,7 +2255,11 @@ export const testSeries: TestSeriesObject = {
       },
       videoSubtitles: {
         enabled: false,
-        autoStart: false,
+        autoStart: {
+          youtube: false,
+          xcom: false,
+          netflix: false,
+        },
         providerId: "google-default",
         style: {
           displayMode: "bilingual",

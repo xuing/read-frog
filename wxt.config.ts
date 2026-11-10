@@ -3,6 +3,7 @@ import process from "node:process"
 import ViteYaml from "@modyfi/vite-plugin-yaml"
 import { defineConfig } from "wxt"
 import { z } from "zod"
+import { escapeNoncharactersPlugin } from "./scripts/escape-noncharacters"
 import {
   createExtensionClientEnvSchema,
   isLocalPackagesEnabled,
@@ -11,6 +12,8 @@ import {
 } from "./src/env/shared"
 
 const WXT_API_KEY_PATTERN = /^WXT_.*API_KEY/
+// entrypoints/content-runtime, the ES module behind every page's content scripts
+const CONTENT_RUNTIME_NAME = "content-runtime"
 const ALLOWED_BUNDLED_API_KEYS = new Set(["WXT_POSTHOG_API_KEY"])
 const useLocalPackages = isLocalPackagesEnabled(process.env)
 const shouldSkipEnvValidation = process.env.WXT_SKIP_ENV_VALIDATION === "true"
@@ -71,6 +74,16 @@ export default defineConfig({
         resources: ["assets/*.png", "assets/*.svg", "assets/*.webp"],
         matches: ["*://*/*", "file:///*"],
       },
+      // The shared content runtime the loader content script imports, and its
+      // chunks. No `use_dynamic_url`: Chrome 130 and 131 block a content
+      // script's import() of a dynamic URL with the content script CSP
+      // (crbug.com/363027634, fixed in 132), so nothing would load there. The
+      // chunks couldn't use one anyway, since Chrome resolves a module's
+      // relative imports against the extension's static id.
+      {
+        resources: [`${CONTENT_RUNTIME_NAME}.js`, `${CONTENT_RUNTIME_NAME}/*`],
+        matches: ["*://*/*", "file:///*"],
+      },
     ],
     // Firefox-specific settings for MV3
     ...(browser === "firefox" && {
@@ -103,7 +116,29 @@ export default defineConfig({
     },
     "vite:build:extendConfig": (entrypoints, viteConfig) => {
       const entrypoint = entrypoints.length === 1 ? entrypoints[0] : undefined
+      if (entrypoint?.type === "unlisted-script" && entrypoint.name === CONTENT_RUNTIME_NAME) {
+        // WXT builds every script as one IIFE. The content runtime is imported
+        // as an ES module instead, so it can leave code (such as the locales
+        // it doesn't use) in chunks that load when needed.
+        if (viteConfig.build?.lib) viteConfig.build.lib.formats = ["es"]
+        const output = viteConfig.build?.rollupOptions?.output
+        for (const outputOptions of Array.isArray(output) ? output : output ? [output] : []) {
+          outputOptions.chunkFileNames = `${CONTENT_RUNTIME_NAME}/[name]-[hash].js`
+          outputOptions.assetFileNames = "assets/[name]-[hash].[ext]"
+          // Vite keeps whitespace and pure annotations in ES library output for
+          // the bundlers that would consume it; nothing bundles this one again.
+          if (viteConfig.build?.minify !== false) {
+            outputOptions.minify = true
+            outputOptions.comments = false
+          }
+        }
+        return
+      }
       if (entrypoint?.type !== "content-script") return
+
+      // Chrome loads a content script file only if it holds no Unicode
+      // noncharacter, which Temml's lexer has (see escape-noncharacters).
+      viteConfig.plugins = [...(viteConfig.plugins ?? []), escapeNoncharactersPlugin()]
 
       const output = viteConfig.build?.rollupOptions?.output
       if (!output) return

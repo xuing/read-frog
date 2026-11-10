@@ -7,11 +7,11 @@ import { IconGripHorizontal, IconPin, IconPinnedFilled, IconX } from "@tabler/ic
 import * as React from "react"
 import { Rnd } from "react-rnd"
 import { Button } from "@/components/ui/base-ui/button"
+import { NOTRANSLATE_CLASS } from "@/utils/constants/dom-labels"
 import {
   SELECTION_CONTENT_OVERLAY_LAYERS,
   SELECTION_CONTENT_OVERLAY_ROOT_ATTRIBUTE,
-} from "@/entrypoints/selection.content/overlay-layers"
-import { NOTRANSLATE_CLASS } from "@/utils/constants/dom-labels"
+} from "@/utils/constants/selection-overlay-layers"
 import { cn } from "@/utils/styles/utils"
 import { usePreventScrollThrough } from "./use-prevent-scroll-through"
 import {
@@ -19,12 +19,15 @@ import {
   SELECTION_POPOVER_NO_DRAG_SELECTOR,
   SELECTION_POPOVER_RESIZE_HANDLE_STYLES,
   SELECTION_POPOVER_RESIZE_HANDLES,
+  SELECTION_POPOVER_RESIZE_HANDLES_CLASS,
   useSelectionPopoverLayout,
 } from "./use-selection-popover-layout"
 
 interface SelectionPopoverPosition {
   x: number
   y: number
+  /** Opens with its bottom edge at `y` and grows upward, instead of opening at `y`. */
+  above?: boolean
 }
 
 interface SelectionPopoverActions {
@@ -101,6 +104,7 @@ function SelectionPopoverRoot({
   actionsRef,
   onAnchorChange,
   onOpenChange,
+  onOpenChangeRequest,
   onPinnedChange,
   onReuseRequest,
 }: {
@@ -114,6 +118,10 @@ function SelectionPopoverRoot({
   actionsRef?: React.RefObject<SelectionPopoverActions | null>
   onAnchorChange?: (anchor: SelectionPopoverPosition | null) => void
   onOpenChange?: (open: boolean) => void
+  onOpenChangeRequest?: (
+    open: boolean,
+    eventDetails: DialogPrimitive.Root.ChangeEventDetails,
+  ) => void
   onPinnedChange?: (pinned: boolean) => void
   onReuseRequest?: (details: { anchor: SelectionPopoverPosition | null }) => void
 }) {
@@ -244,6 +252,28 @@ function SelectionPopoverRoot({
     }
   }, [instanceId, open, setOpen])
 
+  React.useEffect(() => {
+    if (!open || pinned || disablePointerDismissal) {
+      return undefined
+    }
+
+    // A press inside an iframe never reaches this document, so Base UI cannot
+    // treat it as an outside press: on readfrog.app, whose ebook reader shows
+    // the book in one, clicking elsewhere in the book left the popover open.
+    // This window sees its own blur instead, with the frame as the active
+    // element, once the press moves focus into the frame.
+    const handleWindowBlur = () => {
+      if (document.activeElement instanceof HTMLIFrameElement) {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener("blur", handleWindowBlur)
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur)
+    }
+  }, [disablePointerDismissal, open, pinned, setOpen])
+
   const contextValue = React.useMemo(
     () => ({
       open,
@@ -263,7 +293,11 @@ function SelectionPopoverRoot({
     <SelectionPopoverRootContext value={contextValue}>
       <DialogPrimitive.Root
         open={open}
-        onOpenChange={(nextOpen) => {
+        onOpenChange={(nextOpen, eventDetails) => {
+          onOpenChangeRequest?.(nextOpen, eventDetails)
+          if (eventDetails.isCanceled) {
+            return
+          }
           setOpen(nextOpen)
         }}
         disablePointerDismissal={pinned || disablePointerDismissal}
@@ -331,6 +365,7 @@ function SelectionPopoverShell({
   handleDragStop,
   handleResizeStop,
   handleWheel,
+  handlePointerDown,
   isDragging: _isDragging,
   minHeight,
   minWidth,
@@ -371,8 +406,14 @@ function SelectionPopoverShell({
       maxHeight="100vh"
       dragHandleClassName={SELECTION_POPOVER_DRAG_HANDLE_CLASS}
       cancel={SELECTION_POPOVER_NO_DRAG_SELECTOR}
+      // react-draggable's hack clears the page's selection a frame after a drag
+      // ends or the popover unmounts. Closing the popover by selecting other
+      // text then wiped that new selection. The drag handle is `select-none`, so
+      // a drag starts no selection to clear.
+      enableUserSelectHack={false}
       enableResizing={SELECTION_POPOVER_RESIZE_HANDLES}
       resizeHandleStyles={SELECTION_POPOVER_RESIZE_HANDLE_STYLES}
+      resizeHandleWrapperClass={SELECTION_POPOVER_RESIZE_HANDLES_CLASS}
       onMouseDown={
         onMouseDown
           ? (e) => onMouseDown(e as unknown as React.MouseEvent<HTMLDivElement>)
@@ -407,6 +448,7 @@ function SelectionPopoverShell({
         handleResizeStop(elementRef, { x: resizedPosition.x, y: resizedPosition.y })
       }}
       onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
     >
       {children}
     </Rnd>
@@ -443,6 +485,7 @@ function SelectionPopoverContent({
     handleDragStop,
     handleResizeStop,
     handleWheel,
+    handlePointerDown,
   } = useSelectionPopoverLayout({
     anchor,
     isVisible: open,
@@ -515,6 +558,7 @@ function SelectionPopoverContent({
           handleDragStop={handleDragStop}
           handleResizeStop={handleResizeStop}
           handleWheel={handleWheel}
+          handlePointerDown={handlePointerDown}
         >
           {shell}
         </SelectionPopoverShell>

@@ -10,7 +10,9 @@ import { MAX_CUSTOM_CSS_LENGTH } from "./translate"
  * URL patterns accept bare hostnames ("github.com"), subdomain wildcards
  * ("*.example.com"), path wildcards (e.g. "github.com/<user>/settings"), and
  * full match patterns ("https://example.com" plus a path wildcard). Query
- * strings are ignored when matching.
+ * strings are ignored when matching. "*" covers every http(s) page;
+ * "<all_urls>" covers every URL, local files and data:/blob: frames included.
+ * `contentTypes` narrows a rule to kinds of document rather than sites.
  *
  * This schema is deliberately lenient (structure only): an invalid selector or
  * URL pattern is dropped with a warning at resolve time instead of failing the
@@ -23,6 +25,13 @@ export const siteRuleSchema = z.object({
   description: z.string().optional(),
   matches: z.union([z.string(), z.array(z.string())]),
   excludeMatches: z.array(z.string()).optional(),
+  // Document MIME types (`document.contentType`) the rule is limited to. When
+  // listed, the rule applies only if the URL matches AND the document is one of
+  // these types, which is how a rule targets a kind of page instead of a site:
+  // the browser's plain-text viewer shows a whole .txt or .md file as one
+  // generated <pre> on any host. Compared case-insensitively, parameters such as
+  // "; charset=utf-8" ignored. Omitted means any type.
+  contentTypes: z.array(z.string()).optional(),
   excludeSelectors: z.array(z.string()).optional(),
   "excludeSelectors.add": z.array(z.string()).optional(),
   "excludeSelectors.remove": z.array(z.string()).optional(),
@@ -51,6 +60,13 @@ export const siteRuleSchema = z.object({
   atomSelectors: z.array(z.string()).optional(),
   "atomSelectors.add": z.array(z.string()).optional(),
   "atomSelectors.remove": z.array(z.string()).optional(),
+  // Hidden regions the walk still enters: menus and panels a site shows with
+  // pure CSS (`:hover`, `:checked`) change no DOM when they open, so a walk
+  // that skipped them while hidden would never come back. Their content is
+  // labeled up front and translated through the usual viewport gate.
+  walkHiddenSelectors: z.array(z.string()).optional(),
+  "walkHiddenSelectors.add": z.array(z.string()).optional(),
+  "walkHiddenSelectors.remove": z.array(z.string()).optional(),
   // Tag-NAME lists (not CSS selectors) that patch the built-in DOM tag sets
   // (see DEFAULT_TAG_SETS in utils/constants/dom-rules). Delta-only by design:
   // there is deliberately no bare base key, so a rule can never be misread as

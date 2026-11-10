@@ -44,3 +44,28 @@ export const DEFAULT_SELECTION_SPEAK_SHORTCUT_KEY = "Alt+Shift+R"
 export function getSpeakShortcut(speak: { shortcut?: string }) {
   return speak.shortcut ?? DEFAULT_SELECTION_SPEAK_SHORTCUT_KEY
 }
+
+// Annotates the selection: underlines it and writes its meaning between the
+// lines. Alt+Shift, like the other toolbar keys; A is kept by Chrome, so E,
+// for "explain".
+export const DEFAULT_SELECTION_ANNOTATION_SHORTCUT_KEY = "Alt+Shift+E"
+
+// Annotation's key: a config without one has the default key, an empty one has none.
+export function getAnnotationShortcut(annotation: { shortcut?: string }) {
+  return annotation.shortcut ?? DEFAULT_SELECTION_ANNOTATION_SHORTCUT_KEY
+}
+
+// Turns annotation mode on and off from the page, without opening the toolbar
+// for its switch. Alt+Shift like the annotate key; P, for the pen on the switch
+// and the mode's pill. Not N: Chrome on Windows and Linux keeps Shift+Alt+N for
+// split view, and ChromeOS keeps it for notifications, so the page never sees it.
+export const DEFAULT_ANNOTATION_MODE_SHORTCUT_KEY = "Alt+Shift+P"
+
+// Annotation mode's key: a config without one has the default key, an empty one has none.
+export function getAnnotationModeShortcut(annotation: { modeShortcut?: string }) {
+  return annotation.modeShortcut ?? DEFAULT_ANNOTATION_MODE_SHORTCUT_KEY
+}
+
+// The most text one annotation takes: a word or a phrase, whose meaning fits
+// between two lines, not a passage.
+export const MAX_ANNOTATION_TEXT_LENGTH = 200

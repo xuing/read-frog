@@ -115,6 +115,7 @@ options:
     product: 製品
   tools:
     translationHub: 翻訳ハブ
+    pdfTranslation: PDF 翻訳
   product:
     roadmap: ロードマップ
   helpAndCommunity:
@@ -157,6 +158,8 @@ options:
       resetsAt: "$1 にリセット"
       daily: 日次クォータ
       weekly: 週間クォータ
+      oneTime: ボーナスクォータ
+      expiresAt: "$1 に期限切れ"
       features:
         pageTranslation: ページ翻訳
         customAction: カスタム AI アクション
@@ -165,14 +168,15 @@ options:
         videoSubtitles: 動画字幕
         inputTranslation: 入力翻訳
         languageDetection: 言語検出
+        pdfTranslation: PDF 翻訳
     sponsorCta: 高速で高コスパのAIを入手
-    sponsorCtaJalapenoCloud: GLM 5.2 を 50% オフで入手
+    sponsorCtaJalapenoCloud: GLM 5.3 を 50% オフで入手
     setApiKeyWarning:
       message: API キーは $1 ページで設定してください
     badges:
       featureCount: $1 件の機能
       sponsor: スポンサー
-      sponsorJalapenoCloud: $$2 無料
+      sponsorJalapenoCloud: $$1 無料
     dialog:
       title: 新しいプロバイダーを追加
       groups:
@@ -251,7 +255,7 @@ options:
         customChatComplete: カスタム Chat Complete
         customResponses: カスタム Responses
       attribution:
-        builtInAi: Read Frog がホストする標準モデル。Ultra 以外のユーザーはカスタム AI アクションでのみ利用でき、Ultra ユーザーはより多くの機能で利用できます。
+        builtInAi: Read Frog がホストする標準モデル。Pro と Ultra のユーザーは週間クォータの範囲ですべての機能で利用でき、無料プランではカスタム AI アクションでのみ利用できます。
         builtInAiAdvance: Read Frog がホストする高性能モデルで、Ultra メンバー専用です。ページ翻訳やカスタム AI アクションなど、すべての組み込み AI 機能で利用でき、週間クォータを共有します。標準モデルよりクォータの消費が速くなります。
       description:
         openai: GPT-4oなどのモデルを提供
@@ -307,7 +311,7 @@ options:
         noteSuggestion: ノートの提案
       descriptions:
         pageTranslation: ページ全体を対訳または置き換えで翻訳します。
-        selectionTranslation: 選択ツールバーから、選択したテキストを翻訳します。
+        selectionTranslation: "選択したテキストを翻訳します。単語注釈の意味にも使われます。"
         inputTranslation: 入力欄に書いた文章を、送信する前に翻訳します。
         videoSubtitles: 動画プレーヤーに表示される字幕を翻訳します。
         noteSuggestion: 選択テキストを翻訳した後、Notebase に保存する価値のある単語を提案します。
@@ -545,6 +549,12 @@ options:
     selectionSpeak:
       title: "選択範囲の読み上げ"
       description: "選択したテキストを読み上げます。もう一度押すと停止します。"
+    selectionAnnotation:
+      title: "注釈"
+      description: "選択したテキストに下線を引き、行間に意味を表示します。"
+    selectionAnnotationMode:
+      title: "注釈モード"
+      description: "ツールバーを開かずに注釈モードをオン・オフします。オンの間は、選択したテキストに自動で注釈が付きます。"
     actions:
       title: "AI アクション"
       description: "選択したテキストに AI アクションを実行します。カスタムアクションには最初はショートカットがないので、ここで設定してください。"
@@ -617,6 +627,14 @@ options:
     enable:
       title: 選択ツールバーを有効化
       description: ウェブページでテキストを選択したときにツールバーを表示し、すばやく翻訳・読み上げ・AIアクションを実行します
+    annotation:
+      title: "単語注釈"
+      enable:
+        title: "有効にする"
+        description: "選択した単語やフレーズに下線を引き、行間に意味を書き込みます"
+      provider:
+        title: "プロバイダー"
+        description: "意味を生成します。「翻訳」と同じ設定です"
     actions:
       title: アクション
       translate:
@@ -780,6 +798,8 @@ options:
             unquotedAttributeOutput: この属性値を引用符で囲んでください。囲まないと値が属性の外にはみ出すおそれがあります。
             filterIgnored: 「$1」タグではフィルターは無視されます。先にフィルター後の値を代入してください。
             newlineToBrNotLast: newline_to_br は出力の最後のフィルターとしてのみ機能します。
+            mathFilterNotLast: $1 は出力の最後のフィルターとしてのみ機能します。
+            mathFilterInAttribute: 属性値の中では $1 を使わないでください。描画した数式に含まれる引用符で属性が終わってしまいます。
             tooLong: このレイアウトは $1 文字を超えているため保存できません。
             fieldNotShown: 「$1」はこのレイアウトに表示されません。
             reservedFieldName: フィールド名「$1」はレイアウトの予約名です。フィールドの名前を変更してください。
@@ -814,16 +834,16 @@ options:
           schemaErrorDescription: 少し待ってからもう一度更新してください。
           schemaLoading: notebase スキーマを読み込み中...
           mappingsLabel: フィールドマッピング
-          mappingsEmpty: まだマッピングはありません。フィールドを保存する準備ができたら追加してください。
-          addMappingAction: マッピングを追加
-          removeMappingAction: マッピングを削除
           localFieldLabel: アクションフィールド
-          localFieldPlaceholder: アクションフィールドを選択
           remoteFieldLabel: Notebase フィールド
-          remoteFieldPlaceholder: notebase フィールドを選択
           columnUnavailableOption: 削除済み
           invalidMappingsTitle: 一部のマッピングに対応が必要です
           invalidMappingsDescription: 無効なマッピングは保持されます。Notebase に保存する前に修正してください。
+          noFieldSavedTitle: "この Notebase に保存されるフィールドがありません"
+          noFieldSavedDescription: "ノートを保存するには、少なくとも 1 つのフィールドに Notebase フィールドを選んでください。"
+          mappingSummary: "保存 $1 · 保存しない $2 · 未決定 $3"
+          skipFieldOption: "保存しない"
+          undecidedFieldPlaceholder: "Notebase フィールドを選ぶか、保存しない"
           mappingMissingLocal: マッピングされたアクションフィールドは存在しなくなりました。
           mappingMissingRemote: マッピングされた notebase フィールドは存在しなくなりました。
           mappingMissingSchema: このマッピングを検証するには、notebase スキーマを更新してください。
@@ -1448,13 +1468,19 @@ options:
       title: 基本設定
       enable:
         title: 動画字幕を有効にする
-        description: YouTube、X、Netflix の動画プレーヤーのコントロールバーに翻訳ボタンを表示します。
+        description: YouTube、X、Netflix、Bilibili、Udemy、edX の動画プレーヤーのコントロールバーに翻訳ボタンを表示します。
       autoStart:
         title: 動画を開いたら翻訳する
         description: 動画の読み込みが終わり次第、ボタンを押さなくても字幕の翻訳を始めます。
       aiSegmentation:
         title: AI スマート区切り
-        description: AI が字幕を文として読める形に切り直します。タイミングも AI が決めるため、字幕がずれることがあります。LLM 翻訳プロバイダーが必要です。
+        description: AI が字幕を文単位に切り直します。翻訳の応答が遅くなります。高性能な LLM が必要です。性能の低いモデルでは字幕の欠落やずれが起きることがあります。
+      wordLookupAction:
+        title: 単語クリック時のアクション
+        description: 字幕の単語をクリックしたときに実行する AI アクション。既定は辞書で、自分のアクションにも変更できます。
+      pauseOnHover:
+        title: ホバーで一時停止
+        description: ポインターを字幕の上にしばらく置くと動画を一時停止し、離すと再生を再開します。単語をクリックして調べるときは常に一時停止します。
     aiQuota:
       title: AI字幕の利用枠
       description: AIの音声認識で、どんな動画にも正確な字幕を生成します
@@ -1607,6 +1633,19 @@ translation:
   sameLanguage: ソース言語とターゲット言語は異なる必要があります
   autoModeSameLanguage: 検出された言語 '$1' はターゲット言語と同じです
   extensionContextInvalidated: 拡張機能が更新されました。このページを再読み込みしてからもう一度お試しください。
+annotation:
+  annotate: "注釈を付ける"
+  enterMode: "注釈モード"
+  exitMode: "注釈モードを終了"
+  modeLabel: "注釈モード"
+  noTextSelected: "テキストが選択されていません"
+  tooLong: "注釈を付けるには単語か短いフレーズを選択してください"
+  multipleParagraphs: "注釈を付けるには同じ段落内のテキストを選択してください"
+  translatedTextUnsupported: "翻訳文には注釈を付けられません"
+  unsupportedPlace: "ここのテキストには注釈を付けられません"
+  markOnly: "マークしました。この行間には意味を表示する余白がありません。"
+  failed: "意味を取得できませんでした"
+  remove: "注釈を削除"
 speak:
   languageDetectionFallback: ローカルの言語検出に切り替えました
   languageDetectionSettingsHint: 設定で利用可能なLLMに変更するか、ローカル検出を選んでください。
@@ -1632,6 +1671,10 @@ action:
   saveToNotebaseLimitExceeded: さらに Notebase ノートを保存するにはアップグレードが必要です
   saveToNotebaseTableUnavailable: 選択した Notebase は利用できなくなりました
   saveToNotebaseConnectionInvalid: この Notebase 接続は古くなっています。Custom AI Actions で更新し、マッピングを修正してください。
+  saveToNotebaseInvalidContent: "AI の回答に形式の合わない値があったため、保存しませんでした。もう一度実行してから保存してください。"
+  saveToNotebaseNoFieldSaved: "保存しませんでした：この操作には Notebase に保存するフィールドがありません。設定で少なくとも 1 つ選んでください。"
+  saveToNotebaseUndecidedTitle: "保存しました。次のフィールドは保存するかまだ決まっていません"
+  saveToNotebaseSkipUndecided: "すべて保存しない"
   saveToNotebaseNoMappings: 保存する前に、少なくとも1つの有効なマッピングを追加してください
   saveToNotebaseCreateTitle: Notebase を作成しますか？
   saveToNotebaseCreateDescription: この Custom Action の出力フィールドに合わせた列を持つ Notebase を作成し、現在の結果を最初のノートとして保存します。
@@ -1702,10 +1745,12 @@ subtitles:
   aiSubtitlesHint: 先進的なAI音声認識により正確な字幕を生成。公式字幕がない動画でも利用できます。
   requestAiSubtitles: AI字幕をリクエスト
   usingAiSubtitles: AI字幕を使用中
+  settings: 字幕設定
   toggle:
     enabled: 字幕翻訳をオンにしました
     disabled: 字幕翻訳をオフにしました
   actions:
+    download: 字幕をダウンロード
     downloadTranslated: 翻訳字幕をダウンロード
     downloadTranslatedPreparing: 字幕を準備中。長い動画は時間がかかる場合があります
     downloadTranslatedTranslating: 字幕を翻訳中
@@ -1746,11 +1791,13 @@ subtitles:
     translatedExportIncomplete: すべての字幕行を翻訳できませんでした
     translatedExportSameLanguage: 元の言語と翻訳先の言語が同じです
 hostedAi:
-  ultraBadge:
-    tooltip: Ultra プランへの加入が必要です · バッジをクリックしてプランを取得
+  planBadge:
+    pro: Pro または Ultra プランへの加入が必要です · バッジをクリックしてプランを取得
+    ultra: Ultra プランへの加入が必要です · バッジをクリックしてプランを取得
   availability:
     authenticationRequired: ログインすると利用できます
     ultraRequired: Ultra プランが必要です
+    proRequired: Pro または Ultra プランが必要です
     quotaExhausted: 利用枠を使い切りました
     serviceUnavailable: 一時的に利用できません
     usedPercent: "利用枠: $1% 使用済み"

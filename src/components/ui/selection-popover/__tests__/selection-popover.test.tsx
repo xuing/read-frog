@@ -125,8 +125,12 @@ vi.mock("react-rnd", async () => {
           ...props.style,
         }}
         onWheel={props.onWheel}
+        onPointerDown={props.onPointerDown}
       >
         {props.children}
+        <div className={props.resizeHandleWrapperClass}>
+          <div data-testid="mock-resize-handle" />
+        </div>
       </div>
     )
   }
@@ -195,6 +199,15 @@ function buildTriggerRect({
   } as DOMRect
 }
 
+// What the window sees when a press inside an iframe takes focus: its own
+// blur, with the frame as the active element.
+function blurWindowIntoIframe() {
+  vi.spyOn(document, "activeElement", "get").mockReturnValue(document.createElement("iframe"))
+  act(() => {
+    window.dispatchEvent(new FocusEvent("blur"))
+  })
+}
+
 function expectLatestPosition(position: { x: number; y: number }) {
   expect(latestRndProps?.position).toEqual(position)
   expect(mockRndRect.left).toBe(position.x)
@@ -208,6 +221,7 @@ function renderPopover({
   onOpenChange = onOpenChangeSpy,
   triggerRect = buildTriggerRect(),
   contentProps,
+  rootProps,
 }: {
   customTrigger?: boolean
   triggerLabel?: string
@@ -215,9 +229,10 @@ function renderPopover({
   onOpenChange?: typeof onOpenChangeSpy
   triggerRect?: DOMRect
   contentProps?: Partial<React.ComponentProps<typeof SelectionPopover.Content>>
+  rootProps?: Partial<React.ComponentProps<typeof SelectionPopover.Root>>
 } = {}) {
   render(
-    <SelectionPopover.Root onOpenChange={onOpenChange}>
+    <SelectionPopover.Root onOpenChange={onOpenChange} {...rootProps}>
       <SelectionPopover.Trigger
         render={
           customTrigger ? (
@@ -525,6 +540,56 @@ describe("selectionPopover", () => {
     })
   })
 
+  describe("pointer capture", () => {
+    const setPointerCapture = vi.fn<(pointerId: number) => void>()
+
+    beforeEach(() => {
+      setPointerCapture.mockReset()
+      Element.prototype.setPointerCapture = setPointerCapture
+    })
+
+    afterEach(() => {
+      // jsdom has no pointer capture of its own.
+      delete (Element.prototype as Partial<Element>).setPointerCapture
+    })
+
+    it("captures the pointer when a drag starts on the header", () => {
+      renderPopover()
+      const title = screen.getByText("Test Popover")
+
+      fireEvent.pointerDown(title, { button: 0, pointerId: 7 })
+
+      expect(setPointerCapture).toHaveBeenCalledExactlyOnceWith(7)
+      expect(setPointerCapture.mock.contexts).toEqual([
+        title.closest(".rf-selection-popover-drag-handle"),
+      ])
+    })
+
+    it("captures the pointer when a resize starts on an edge handle", () => {
+      renderPopover()
+      const handle = screen.getByTestId("mock-resize-handle")
+
+      fireEvent.pointerDown(handle, { button: 0, pointerId: 7 })
+
+      expect(latestRndProps?.resizeHandleWrapperClass).toBe("rf-selection-popover-resize-handles")
+      expect(setPointerCapture).toHaveBeenCalledExactlyOnceWith(7)
+      expect(setPointerCapture.mock.contexts).toEqual([handle])
+    })
+
+    it("leaves header buttons, the body, and non-primary buttons alone", () => {
+      renderPopover()
+
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Pin popover" }), {
+        button: 0,
+        pointerId: 7,
+      })
+      fireEvent.pointerDown(screen.getByText("Popover content"), { button: 0, pointerId: 7 })
+      fireEvent.pointerDown(screen.getByText("Test Popover"), { button: 2, pointerId: 7 })
+
+      expect(setPointerCapture).not.toHaveBeenCalled()
+    })
+  })
+
   it("applies configured opacity on the popover surface instead of the viewport host", () => {
     const { element } = renderPopover()
 
@@ -588,6 +653,42 @@ describe("selectionPopover", () => {
 
     expect(onOpenChangeSpy).toHaveBeenLastCalledWith(false)
     expect(screen.queryByTestId("mock-rnd")).not.toBeInTheDocument()
+  })
+
+  it("keeps the popover open when the consumer cancels the outside press", async () => {
+    const onOpenChangeRequest = vi.fn<
+      NonNullable<React.ComponentProps<typeof SelectionPopover.Root>["onOpenChangeRequest"]>
+    >((_open, eventDetails) => {
+      if (eventDetails.reason === "outside-press") {
+        eventDetails.cancel()
+      }
+    })
+    renderPopover({ rootProps: { onOpenChangeRequest } })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const mouseDownEvent = new MouseEvent("mousedown", { bubbles: true })
+    Object.defineProperty(mouseDownEvent, "composedPath", {
+      value: () => [document.body, document, window],
+    })
+    const clickEvent = new MouseEvent("click", { bubbles: true })
+    Object.defineProperty(clickEvent, "composedPath", {
+      value: () => [document.body, document, window],
+    })
+
+    act(() => {
+      document.body.dispatchEvent(mouseDownEvent)
+      document.body.dispatchEvent(clickEvent)
+    })
+
+    expect(onOpenChangeRequest).toHaveBeenCalledWith(
+      false,
+      expect.objectContaining({ reason: "outside-press" }),
+    )
+    expect(screen.getByTestId("mock-rnd")).toBeInTheDocument()
+    expect(onOpenChangeSpy).not.toHaveBeenCalledWith(false)
   })
 
   it("keeps the popover open when pointer dismissal is disabled", async () => {
@@ -665,6 +766,45 @@ describe("selectionPopover", () => {
       "aria-pressed",
       "true",
     )
+    expect(onOpenChangeSpy).not.toHaveBeenCalledWith(false)
+  })
+
+  it("closes the popover when a press moves focus into an iframe", () => {
+    renderPopover()
+
+    blurWindowIntoIframe()
+
+    expect(onOpenChangeSpy).toHaveBeenLastCalledWith(false)
+    expect(screen.queryByTestId("mock-rnd")).not.toBeInTheDocument()
+  })
+
+  it("keeps the popover open when the window loses focus to another window", () => {
+    renderPopover()
+
+    act(() => {
+      window.dispatchEvent(new FocusEvent("blur"))
+    })
+
+    expect(screen.getByTestId("mock-rnd")).toBeInTheDocument()
+    expect(onOpenChangeSpy).not.toHaveBeenCalledWith(false)
+  })
+
+  it("keeps a pinned popover open when a press moves focus into an iframe", () => {
+    renderPopover()
+    fireEvent.click(screen.getByRole("button", { name: "Pin popover" }))
+
+    blurWindowIntoIframe()
+
+    expect(screen.getByTestId("mock-rnd")).toBeInTheDocument()
+    expect(onOpenChangeSpy).not.toHaveBeenCalledWith(false)
+  })
+
+  it("keeps the popover open on a press in an iframe when pointer dismissal is disabled", () => {
+    renderPopover({ rootProps: { disablePointerDismissal: true } })
+
+    blurWindowIntoIframe()
+
+    expect(screen.getByTestId("mock-rnd")).toBeInTheDocument()
     expect(onOpenChangeSpy).not.toHaveBeenCalledWith(false)
   })
 
@@ -1004,6 +1144,20 @@ describe("selectionPopover", () => {
     triggerResizeObserver()
 
     expectLatestPosition({ x: 120, y: 540 })
+  })
+
+  it("opens above an anchor that asks for it, and keeps growing upward from there", () => {
+    const { element } = renderPopover({
+      rootProps: { anchor: { x: 120, y: 700, above: true } },
+    })
+
+    expectLatestPosition({ x: 120, y: 480 })
+
+    // Moved within the same frame, so it never shows over what is below it.
+    mockRect(element, { left: 120, top: 480, width: 500, height: 300 })
+    triggerResizeObserver()
+
+    expectLatestPosition({ x: 120, y: 400 })
   })
 
   it("keeps dragging aligned to viewport coordinates when the rnd parent has a vertical offset", async () => {

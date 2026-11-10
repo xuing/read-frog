@@ -11,6 +11,7 @@ vi.mock("@/utils/i18n", () => ({
 import {
   formatHostedAiResetAtLocal,
   getHostedAiCreditForFeature,
+  getHostedAiPools,
   getHostedAiTierDescription,
   getHostedAiTierStatus,
 } from "../status"
@@ -22,7 +23,7 @@ function tier(overrides: Partial<HostedAiTierStatus> = {}): HostedAiTierStatus {
     accessAllowed: true,
     available: true,
     unavailableReason: null,
-    requiresUltra: false,
+    upgradeTo: null,
     modelRevision: "normal-r7",
     ...overrides,
   }
@@ -37,9 +38,20 @@ function featureMap(
 }
 
 describe("hosted AI status presentation", () => {
+  it("reports no tier status for a feature the status has no entry for", () => {
+    // PDF translation draws on the credit pools but has no per-tier status.
+    const status: HostedAiStatus = {
+      pools: [],
+      features: featureMap(() => ({ normal: tier(), advance: tier() })),
+    }
+
+    expect(getHostedAiTierStatus(status, "pdfTranslation", "normal")).toBeUndefined()
+    expect(getHostedAiTierStatus(status, "pageTranslation", "normal")).toEqual(tier())
+  })
+
   it("shows one shared weekly credit for both model tiers", () => {
     const status: HostedAiStatus = {
-      credits: [
+      pools: [
         {
           periodKind: "weekly",
           usedPercent: 37.6,
@@ -78,7 +90,7 @@ describe("hosted AI status presentation", () => {
 
   it("shows service unavailability without inventing credit for an unfunded page feature", () => {
     const status: HostedAiStatus = {
-      credits: [
+      pools: [
         {
           periodKind: "daily",
           usedPercent: 10,
@@ -123,5 +135,41 @@ describe("hosted AI status presentation", () => {
         credit,
       }),
     ).toBe("hostedAi.availability.ultraRequired")
+  })
+
+  it("finds a feature's recurring pool in pools and never offers a one-time pool for a tier description", () => {
+    const oneTime = {
+      periodKind: "once" as const,
+      usedPercent: 12.5,
+      expiresAt: "2026-11-25T00:00:00.000Z",
+      features: ALL_FEATURES,
+    }
+    const daily = {
+      periodKind: "daily" as const,
+      usedPercent: 40,
+      resetAt: "2026-08-10T00:00:00.000Z",
+      features: ["customAction" as const],
+    }
+    const status: HostedAiStatus = {
+      pools: [daily, oneTime],
+      features: featureMap(() => ({ normal: tier(), advance: tier() })),
+    }
+
+    expect(getHostedAiPools(status)).toEqual([daily, oneTime])
+    expect(getHostedAiCreditForFeature(status, "customAction")).toBe(daily)
+    // Only the one-time pool funds page translation, and it has no reset to show.
+    expect(getHostedAiCreditForFeature(status, "pageTranslation")).toBeUndefined()
+  })
+
+  it("reads no pools while there is no status", () => {
+    expect(getHostedAiPools(undefined)).toEqual([])
+  })
+
+  it("says Pro or Ultra when Pro is the plan a tier asks for", () => {
+    expect(
+      getHostedAiTierDescription(
+        tier({ available: false, unavailableReason: "pro_required", upgradeTo: "pro" }),
+      ),
+    ).toBe("hostedAi.availability.proRequired")
   })
 })

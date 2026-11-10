@@ -1,5 +1,9 @@
 import type { Config } from "@/types/config/config"
-import { getSpeakShortcut } from "@/utils/constants/selection"
+import {
+  getAnnotationModeShortcut,
+  getAnnotationShortcut,
+  getSpeakShortcut,
+} from "@/utils/constants/selection"
 import { getSelectionToolbarActions } from "@/utils/custom-actions"
 import { i18n } from "@/utils/i18n"
 import { isSameShortcut } from "@/utils/shortcut"
@@ -43,6 +47,16 @@ export function getShortcutBindings(config: Config): ShortcutBinding[] {
       id: "selection-speak-shortcut",
       title: i18n.t("options.shortcuts.selectionSpeak.title"),
       shortcut: getSpeakShortcut(features.speak),
+    },
+    {
+      id: "selection-annotation-shortcut",
+      title: i18n.t("options.shortcuts.selectionAnnotation.title"),
+      shortcut: getAnnotationShortcut(config.selectionToolbar.annotation),
+    },
+    {
+      id: "selection-annotation-mode-shortcut",
+      title: i18n.t("options.shortcuts.selectionAnnotationMode.title"),
+      shortcut: getAnnotationModeShortcut(config.selectionToolbar.annotation),
     },
     {
       id: "subtitles-toggle-shortcut",

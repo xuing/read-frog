@@ -70,6 +70,9 @@ function allSelectors(rule: (typeof BUILT_IN_SITE_RULES)[number]): string[] {
     ...(rule.atomSelectors ?? []),
     ...(rule["atomSelectors.add"] ?? []),
     ...(rule["atomSelectors.remove"] ?? []),
+    ...(rule.walkHiddenSelectors ?? []),
+    ...(rule["walkHiddenSelectors.add"] ?? []),
+    ...(rule["walkHiddenSelectors.remove"] ?? []),
   ]
 }
 
@@ -617,8 +620,8 @@ describe("built-in site rules", () => {
 
   // Alibaba's RFQ detail page renders the buyer's hand-written request body in
   // `<pre class="value">` (Details / 详细描述). PRE sits in
-  // DONT_WALK_AND_TRANSLATE_TAGS and the plain-text exemption in
-  // `utils/host/dom/filter` only fires for `text/plain` documents, so on this
+  // DONT_WALK_AND_TRANSLATE_TAGS and `readfrog-plain-text-document` only
+  // matches plain-text and markdown documents, so on this
   // text/html page the whole body was dropped from the walk while every sibling
   // field (Product Name, Category, Quantity) translated normally.
   it("un-blocks PRE on Alibaba's RFQ sourcing portal", () => {
@@ -633,10 +636,6 @@ describe("built-in site rules", () => {
     expect(resolved.dontWalkTags).not.toBeNull()
     expect(resolved.dontWalkTags!.has("PRE")).toBe(false)
     expect(resolved.dontWalkTags!.has("SCRIPT")).toBe(true)
-    // Removal must not register as an explicit add, or the plain-text `<pre>`
-    // exemption in `utils/host/dom/filter` would read it as an authoring
-    // decision to keep PRE blocked.
-    expect(resolved.dontWalkTagsExplicitAdds?.has("PRE") ?? false).toBe(false)
 
     const elsewhere = resolveSiteRule("https://www.alibaba.com/", BUILT_IN_SITE_RULES, [], [])
     expect(elsewhere.dontWalkTags).toBeNull()
@@ -648,6 +647,204 @@ describe("built-in site rules", () => {
       ["alibaba-sourcing-rfq"],
     )
     expect(disabled.dontWalkTags).toBeNull()
+  })
+
+  // A GameFAQs text guide is a text/html page whose whole body is a run of
+  // `<pre id="faqspan-N">` blocks, so the PRE block left nothing to translate
+  // but the page chrome. `readfrog-plain-text-document` does not apply to
+  // text/html.
+  it("un-blocks PRE on GameFAQs guide pages only", () => {
+    for (const url of [
+      "https://gamefaqs.gamespot.com/psp/611279-shin-megami-tensei-persona-2-innocent-sin/faqs/63674",
+      "https://gamefaqs.gamespot.com/psp/611279-shin-megami-tensei-persona-2-innocent-sin/faqs/63674?page=2",
+      "https://gamefaqs.gamespot.com/ps/197340-final-fantasy-vii/faqs/80373/materia",
+    ]) {
+      const resolved = resolveSiteRule(url, BUILT_IN_SITE_RULES, [], [])
+
+      expect(resolved.matchedRuleIds).toContain("gamefaqs-guides")
+      expect(resolved.dontWalkTags).not.toBeNull()
+      expect(resolved.dontWalkTags!.has("PRE")).toBe(false)
+      expect(resolved.dontWalkTags!.has("SCRIPT")).toBe(true)
+    }
+
+    for (const url of [
+      "https://gamefaqs.gamespot.com/",
+      "https://gamefaqs.gamespot.com/psp/611279-shin-megami-tensei-persona-2-innocent-sin/faqs",
+      "https://gamefaqs.gamespot.com/boards/611279-shin-megami-tensei-persona-2-innocent-sin",
+    ]) {
+      expect(resolveSiteRule(url, BUILT_IN_SITE_RULES, [], []).dontWalkTags).toBeNull()
+    }
+
+    const disabled = resolveSiteRule(
+      "https://gamefaqs.gamespot.com/psp/611279-shin-megami-tensei-persona-2-innocent-sin/faqs/63674",
+      BUILT_IN_SITE_RULES,
+      [],
+      ["gamefaqs-guides"],
+    )
+    expect(disabled.dontWalkTags).toBeNull()
+  })
+
+  // A browser shows a .txt or .md file as one generated <pre> holding the whole
+  // file. memu.so serves SKILL.md as text/markdown, which the old hard-coded
+  // text/plain check left untranslated; the rule keys on document type, so it
+  // covers every host, local files, and the data:/blob: frames page
+  // translation injects into (which the hard-coded check also reached).
+  it("un-blocks PRE in documents the browser shows as plain text, on any URL", () => {
+    for (const [url, contentType] of [
+      ["https://memu.so/SKILL.md", "text/markdown"],
+      ["https://raw.githubusercontent.com/psf/requests/main/src/requests/api.py", "text/plain"],
+      ["http://localhost:8000/notes/README.md", "text/x-markdown"],
+      ["file:///Users/someone/notes.txt", "text/plain"],
+      ["data:text/plain;charset=utf-8,First%20paragraph.%0A%0ASecond%20paragraph.", "text/plain"],
+      ["blob:https://example.com/0f2b6a3e-1111-4c2e-9a77-2f6f0a1c9d10", "text/plain"],
+    ] as const) {
+      const resolved = resolveSiteRule(url, BUILT_IN_SITE_RULES, [], [], contentType)
+
+      expect(resolved.matchedRuleIds).toContain("readfrog-plain-text-document")
+      expect(resolved.dontWalkTags).not.toBeNull()
+      expect(resolved.dontWalkTags!.has("PRE")).toBe(false)
+      expect(resolved.dontWalkTags!.has("SCRIPT")).toBe(true)
+    }
+
+    for (const [url, contentType] of [
+      ["https://memu.so/SKILL.md", "text/html"],
+      ["https://example.com/data.json", "application/json"],
+      ["https://example.com/feed.xml", "text/xml"],
+      // Background callers resolve a URL without a document.
+      ["https://memu.so/SKILL.md", undefined],
+    ] as const) {
+      const resolved = resolveSiteRule(url, BUILT_IN_SITE_RULES, [], [], contentType)
+
+      expect(resolved.matchedRuleIds).not.toContain("readfrog-plain-text-document")
+      expect(resolved.dontWalkTags).toBeNull()
+    }
+
+    const disabled = resolveSiteRule(
+      "https://memu.so/SKILL.md",
+      BUILT_IN_SITE_RULES,
+      [],
+      ["readfrog-plain-text-document"],
+      "text/markdown",
+    )
+    expect(disabled.dontWalkTags).toBeNull()
+  })
+
+  it("lets a user rule block PRE again in plain-text documents on one site", () => {
+    const userRule = { id: "user-logs", matches: "logs.example.com", "dontWalkTags.add": ["PRE"] }
+
+    const onSite = resolveSiteRule(
+      "https://logs.example.com/build.txt",
+      BUILT_IN_SITE_RULES,
+      [userRule],
+      [],
+      "text/plain",
+    )
+    expect(onSite.matchedRuleIds).toContain("readfrog-plain-text-document")
+    expect(onSite.dontWalkTags!.has("PRE")).toBe(true)
+
+    const elsewhere = resolveSiteRule(
+      "https://other.example.com/build.txt",
+      BUILT_IN_SITE_RULES,
+      [userRule],
+      [],
+      "text/plain",
+    )
+    expect(elsewhere.dontWalkTags!.has("PRE")).toBe(false)
+  })
+
+  // Tag-set deltas are last-wins in rule order, so a rule that applies
+  // everywhere must come before every site rule or it would silently override
+  // them (e.g. un-block PRE on a site whose rule blocks it).
+  it("keeps every rule that applies everywhere ahead of the site rules", () => {
+    const appliesEverywhere = (rule: (typeof BUILT_IN_SITE_RULES)[number]) => {
+      const patterns = Array.isArray(rule.matches) ? rule.matches : [rule.matches]
+      return patterns.some((pattern) => ["*", "<all_urls>"].includes(pattern.trim()))
+    }
+    const firstSiteRule = BUILT_IN_SITE_RULES.findIndex((rule) => !appliesEverywhere(rule))
+    const lateGlobalRules = BUILT_IN_SITE_RULES.slice(firstSiteRule)
+      .filter(appliesEverywhere)
+      .map((rule) => rule.id)
+
+    expect(firstSiteRule).toBeGreaterThan(0)
+    expect(lateGlobalRules).toEqual([])
+  })
+
+  // A plain-text RFC renders its whole body in <pre>, so the PRE block left
+  // nothing to translate (#2427). v3 RFCs keep code and figures in <pre>,
+  // which must stay out of the walk.
+  it("un-blocks plain-text RFC bodies but keeps v3 RFC code and figures out", () => {
+    for (const url of [
+      "https://www.rfc-editor.org/info/rfc2104/",
+      "https://www.rfc-editor.org/rfc/rfc2104.html",
+      "https://datatracker.ietf.org/doc/html/rfc2104",
+      "https://datatracker.ietf.org/doc/rfc2104/",
+      "https://datatracker.ietf.org/doc/draft-ietf-httpbis-semantics/",
+      "https://www.rfc-editor.org/info/rfc9110/",
+    ]) {
+      const resolved = resolveSiteRule(url, BUILT_IN_SITE_RULES, [], [])
+
+      expect(resolved.matchedRuleIds).toContain("ietf-rfc-plaintext")
+      expect(resolved.dontWalkTags).not.toBeNull()
+      expect(resolved.dontWalkTags!.has("PRE")).toBe(false)
+      expect(resolved.dontWalkTags!.has("SCRIPT")).toBe(true)
+    }
+
+    for (const url of [
+      "https://www.rfc-editor.org/",
+      "https://www.rfc-editor.org/search/rfc_search.php",
+      "https://datatracker.ietf.org/doc/search",
+      "https://datatracker.ietf.org/",
+    ]) {
+      expect(resolveSiteRule(url, BUILT_IN_SITE_RULES, [], []).matchedRuleIds).not.toContain(
+        "ietf-rfc-plaintext",
+      )
+    }
+
+    const { excludeSelector } = resolveSiteRule(
+      "https://www.rfc-editor.org/info/rfc9110/",
+      BUILT_IN_SITE_RULES,
+      [],
+      [],
+    )
+    expect(excludeSelector).not.toBeNull()
+
+    document.body.innerHTML = `
+      <div class="rfc-content rfc-content-type-plaintext">
+        <pre id="title-page">Abstract<span class="grey" id="header">RFC 2104</span></pre>
+        <pre class="newpage" id="page"> body</pre>
+      </div>
+      <div class="rfc-content rfc-content-type-xml2rfc">
+        <div class="bg-gray-100"><pre class="" id="info-figure">UA ==== O</pre></div>
+      </div>
+      <div class="artwork"><pre id="artwork">UA ==== O</pre></div>
+      <pre class="lang-abnf9110 sourcecode" id="abnf">token = 1*tchar</pre>
+    `
+    const matches = (id: string) => document.getElementById(id)!.matches(excludeSelector!)
+
+    expect(matches("title-page")).toBe(false)
+    expect(matches("page")).toBe(false)
+    expect(matches("header")).toBe(true)
+    expect(matches("info-figure")).toBe(true)
+    expect(matches("artwork")).toBe(true)
+    expect(matches("abnf")).toBe(true)
+    document.body.innerHTML = ""
+  })
+
+  // The header dropdowns open on `li:hover`, so no mutation ever brings the
+  // walk back to them once it skipped them as display: none (Featurebase #141).
+  it("walks The North Face Korea's CSS-only header menus while hidden", () => {
+    for (const url of [
+      "https://www.thenorthfacekorea.co.kr/",
+      "https://thenorthfacekorea.co.kr/mens",
+    ]) {
+      const resolved = resolveSiteRule(url, BUILT_IN_SITE_RULES, [], [])
+
+      expect(resolved.matchedRuleIds).toContain("thenorthfacekorea")
+      expect(resolved.walkHiddenSelector).toBe(".header-gnb .twoDepth_wrap")
+    }
+
+    const elsewhere = resolveSiteRule("https://example.com/", BUILT_IN_SITE_RULES, [], [])
+    expect(elsewhere.walkHiddenSelector).toBeNull()
   })
 
   it("retains independently verified content roots that cover their full match scope", () => {

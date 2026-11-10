@@ -101,6 +101,8 @@ if ($behind -eq 0 -and $hasBuild -and -not $Force) {
 }
 
 $env:WXT_SKIP_ENV_VALIDATION = "true"
+# The pre-push hook runs the tests; this one needs live translation services.
+$env:SKIP_FREE_API = "true"
 $merged = $false
 
 try {

@@ -1,15 +1,15 @@
 import type { Config } from "@/types/config/config"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { browser, storage } from "#imports"
-import { i18n } from "@/utils/i18n"
 import {
-  initializeContextMenu,
   MENU_ID_SELECTION_CUSTOM_ACTION_PREFIX,
   MENU_ID_SELECTION_READ_ALOUD,
   MENU_ID_SELECTION_TRANSLATE,
   MENU_ID_TRANSLATE,
-  registerContextMenuListeners,
-} from "../context-menu"
+} from "@/utils/context-menu"
+import { i18n } from "@/utils/i18n"
+import { captureLogs, loggedError, logRecord } from "@/utils/logging/testing"
+import { initializeContextMenu, registerContextMenuListeners } from "../context-menu"
 
 // vi.mock factories run during the static imports above, before this module's
 // own top-level code, so the mocks they return must be hoisted with them.
@@ -53,6 +53,7 @@ describe("background context menu", () => {
   beforeEach(() => {
     contextMenuClickListeners.length = 0
     vi.clearAllMocks()
+    sendMessageMock.mockResolvedValue(undefined)
 
     browser.contextMenus.create = vi.fn<(...args: any[]) => any>()
     browser.contextMenus.removeAll = vi.fn<(...args: any[]) => any>().mockResolvedValue(undefined)
@@ -269,6 +270,39 @@ describe("background context menu", () => {
       "openSelectionCustomActionFromContextMenu",
       { actionId: "dictionary", selectionText: "Selected text" },
       { tabId: 5, frameId: 7 },
+    )
+  })
+
+  it("logs a warning when the clicked tab has no content script to receive the action", async () => {
+    const noReceiver = new Error("Could not establish connection. Receiving end does not exist.")
+    sendMessageMock.mockRejectedValue(noReceiver)
+    const logs = captureLogs()
+    registerContextMenuListeners()
+
+    const clickHandler = contextMenuClickListeners[0]
+    if (!clickHandler) {
+      throw new Error("Context menu click listener was not registered")
+    }
+
+    const tab = { id: 5, url: "chrome://version/" }
+    // storage.getItem defaults to { enabled: true }, so this click toggles off
+    // and sends both the state change and the toggle request.
+    await clickHandler({ menuItemId: MENU_ID_TRANSLATE }, tab)
+    await clickHandler({ menuItemId: MENU_ID_SELECTION_TRANSLATE, selectionText: "Text" }, tab)
+    await clickHandler({ menuItemId: MENU_ID_SELECTION_READ_ALOUD, selectionText: "Text" }, tab)
+    await clickHandler(
+      { menuItemId: `${MENU_ID_SELECTION_CUSTOM_ACTION_PREFIX}action-1`, selectionText: "Text" },
+      tab,
+    )
+    // The sends are not awaited, so let their rejections reach the handlers.
+    await Promise.resolve()
+
+    expect(sendMessageMock).toHaveBeenCalledTimes(5)
+    expect(logs).toHaveLength(5)
+    expect(logs).toContainEqual(
+      logRecord("warn", "Failed to deliver context menu action to the tab", {
+        error: loggedError(noReceiver.message),
+      }),
     )
   })
 })

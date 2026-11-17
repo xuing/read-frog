@@ -328,15 +328,18 @@ vi.mock("../translate-button/translation-content", () => ({
   TranslationContent: ({
     selectionContent,
     translatedText,
+    targetLanguage,
     isTranslating,
   }: {
     selectionContent: string | null | undefined
     translatedText: string | undefined
+    targetLanguage: string
     isTranslating: boolean
   }) => (
     <div data-testid="translation-content">
       <span data-testid="translation-selection">{selectionContent}</span>
       <span data-testid="translation-result">{translatedText ?? ""}</span>
+      <span data-testid="translation-language">{targetLanguage}</span>
       <span data-testid="translation-status">{String(isTranslating)}</span>
     </div>
   ),
@@ -392,15 +395,6 @@ vi.mock("../note-suggestion/use-note-suggestion", () => {
 vi.mock("@/components/ui/base-ui/toast", () => ({
   toastManager: {
     add: (...args: unknown[]) => toastAddMock(...args),
-  },
-}))
-
-vi.mock("@/utils/logger", () => ({
-  logger: {
-    info: vi.fn<(...args: any[]) => any>(),
-    log: vi.fn<(...args: any[]) => any>(),
-    error: vi.fn<(...args: any[]) => any>(),
-    warn: vi.fn<(...args: any[]) => any>(),
   },
 }))
 
@@ -707,7 +701,7 @@ describe("selection toolbar requests", () => {
     expect(translateTextCoreMock).toHaveBeenCalledTimes(1)
 
     const updatedConfig = cloneConfig(store.get(configAtom))
-    updatedConfig.language.targetCode = "jpn"
+    updatedConfig.language.targetCode = "ja"
 
     act(() => {
       store.set(configAtom, updatedConfig)
@@ -719,13 +713,15 @@ describe("selection toolbar requests", () => {
 
     expect(translateTextCoreMock.mock.calls[1]?.[0]).toMatchObject({
       langConfig: expect.objectContaining({
-        targetCode: "jpn",
+        targetCode: "ja",
       }),
     })
 
     await waitFor(() => {
       expect(screen.getByTestId("translation-status").textContent).toBe("false")
     })
+    // Speaking the translation uses the voice for the language it is in.
+    expect(screen.getByTestId("translation-language").textContent).toBe("ja")
   })
 
   it("renders the translation tooltip as non-interactive and closes it on hover leave", async () => {

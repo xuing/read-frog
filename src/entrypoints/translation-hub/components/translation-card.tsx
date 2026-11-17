@@ -1,5 +1,5 @@
 import { Icon } from "@iconify/react"
-import { LANG_CODE_TO_EN_NAME } from "@read-frog/definitions"
+import { LANGUAGE_ENGLISH_NAMES } from "@read-frog/definitions"
 import { useMutation } from "@tanstack/react-query"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { useEffect, useEffectEvent, useRef } from "react"
@@ -7,7 +7,7 @@ import ProviderIcon from "@/components/provider-icon"
 import { useTheme } from "@/components/providers/theme-provider"
 import { Button } from "@/components/ui/base-ui/button"
 import { anchoredToastManager } from "@/components/ui/base-ui/toast"
-import { useTextToSpeech } from "@/hooks/use-text-to-speech"
+import { selectTTSVoice, useTextToSpeech } from "@/hooks/use-text-to-speech"
 import { ANALYTICS_FEATURE, ANALYTICS_SURFACE } from "@/types/analytics"
 import { isLLMProviderConfig } from "@/types/config/provider"
 import { createFeatureUsageContext, trackFeatureAttempt } from "@/utils/analytics"
@@ -114,7 +114,7 @@ export function TranslationCard({
           let result: string
           if (provider.kind === "system") {
             const { systemPrompt, prompt } = await promptResolver(
-              LANG_CODE_TO_EN_NAME[req.targetLanguage],
+              LANGUAGE_ENGLISH_NAMES[req.targetLanguage],
               preparedText,
             )
             const response = await streamBackgroundText(
@@ -212,7 +212,14 @@ export function TranslationCard({
     if (isFetching || isPlaying) {
       stop()
     } else if (mutation.data) {
-      void play(mutation.data, ttsConfig)
+      // Use the target language's voice. Detecting the language instead can
+      // mistake European for Brazilian Portuguese, and Cantonese for Mandarin.
+      const targetLanguage = mutation.variables?.targetLanguage
+      void play(
+        mutation.data,
+        ttsConfig,
+        targetLanguage ? { forcedVoice: selectTTSVoice(ttsConfig, targetLanguage) } : undefined,
+      )
     }
   }
 

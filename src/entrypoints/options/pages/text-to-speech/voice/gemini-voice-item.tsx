@@ -87,8 +87,8 @@ function useGeminiTTSVoices() {
   const providerConfig = resolveGeminiTTSProvider(providersConfig, ttsConfig.gemini.providerId)
   const apiKey = providerConfig?.apiKey?.trim() ?? ""
 
+  // oxlint-disable-next-line query/exhaustive-deps -- The library depends on the account and the route to it; the provider's name or chat model must not refetch it.
   const query = useQuery({
-    // oxlint-disable-next-line query/exhaustive-deps -- The library depends on the account and the route to it; the provider's name or chat model must not refetch it.
     queryKey: [
       "gemini-tts-voices",
       { apiKey, baseURL: providerConfig?.baseURL, headers: providerConfig?.headers },

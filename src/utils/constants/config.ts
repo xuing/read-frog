@@ -64,6 +64,7 @@ import {
   DEFAULT_PRELOAD_THRESHOLD,
   DEFAULT_REQUEST_CAPACITY,
   DEFAULT_REQUEST_RATE,
+  DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_SELECTION_TRANSLATION_SHORTCUT_KEY,
   DEFAULT_TRANSLATION_MODE_SHORTCUT_KEY,
 } from "./translate"
@@ -76,8 +77,8 @@ export const LAST_SYNCED_CONFIG_STORAGE_KEY = "lastSyncedConfig"
 export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = "__googleDriveToken"
 
 export const THEME_STORAGE_KEY = "theme"
-export const DEFAULT_DETECTED_CODE = "eng" as const
-export const CONFIG_SCHEMA_VERSION = 121
+export const DEFAULT_DETECTED_CODE = "en" as const
+export const CONFIG_SCHEMA_VERSION = 126
 
 export const DEFAULT_FLOATING_BUTTON_POSITION = 0.66
 export const DEFAULT_FLOATING_BUTTON_SIDE: FloatingButtonSide = "right"
@@ -169,7 +170,7 @@ export function createDefaultImproveWritingAction(): SelectionToolbarCustomActio
 export const DEFAULT_CONFIG: Config = {
   language: {
     sourceCode: "auto",
-    targetCode: "cmn",
+    targetCode: "zh-Hans",
     level: "intermediate",
   },
   providersConfig: DEFAULT_PROVIDER_CONFIG_LIST,
@@ -204,6 +205,7 @@ export const DEFAULT_CONFIG: Config = {
     requestQueueConfig: {
       capacity: DEFAULT_REQUEST_CAPACITY,
       rate: DEFAULT_REQUEST_RATE,
+      timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     },
     batchQueueConfig: {
       maxCharactersPerBatch: DEFAULT_BATCH_CONFIG.maxCharactersPerBatch,
@@ -294,14 +296,13 @@ export const DEFAULT_CONFIG: Config = {
     timeThreshold: 300,
   },
   videoSubtitles: {
-    enabled: true,
-    autoStart: {
-      youtube: false,
-      xcom: false,
-      netflix: false,
-      bilibili: false,
-      udemy: false,
-      edx: false,
+    platforms: {
+      youtube: "manual",
+      xcom: "manual",
+      netflix: "manual",
+      bilibili: "manual",
+      udemy: "manual",
+      edx: "manual",
     },
     toggleShortcut: DEFAULT_SUBTITLES_TOGGLE_SHORTCUT_KEY,
     providerId: MICROSOFT_TRANSLATE_PROVIDER_ID,
@@ -331,6 +332,7 @@ export const DEFAULT_CONFIG: Config = {
     requestQueueConfig: {
       capacity: DEFAULT_REQUEST_CAPACITY,
       rate: DEFAULT_REQUEST_RATE,
+      timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     },
     batchQueueConfig: {
       maxCharactersPerBatch: DEFAULT_BATCH_CONFIG.maxCharactersPerBatch,

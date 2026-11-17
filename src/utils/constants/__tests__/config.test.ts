@@ -74,6 +74,7 @@ describe("dEFAULT_CONFIG", () => {
       "microsoft-translate-default",
       "openai-default",
       "jalapenocloud-default",
+      "ifapi-default",
       "deepseek-default",
     ])
     expect(DEFAULT_CONFIG.pageTranslation.providerId).toBe("microsoft-translate-default")
@@ -91,6 +92,19 @@ describe("dEFAULT_CONFIG", () => {
           isCustomModel: false,
           customModel: null,
         },
+      }),
+    )
+    expect(
+      DEFAULT_CONFIG.providersConfig.find((provider) => provider.id === "ifapi-default"),
+    ).toEqual(
+      expect.objectContaining({
+        baseURL: "https://cn.ifapi.org/v1",
+        model: {
+          model: "gpt-6-luna",
+          isCustomModel: false,
+          customModel: null,
+        },
+        providerOptions: { reasoning_effort: "none" },
       }),
     )
     expect(
@@ -121,14 +135,14 @@ describe("dEFAULT_CONFIG", () => {
     >
 
     delete legacyNode.forceRetranslation
-    legacyConfig.language.targetCode = "jpn"
+    legacyConfig.language.targetCode = "ja"
 
     const result = configSchema.safeParse(legacyConfig)
 
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.data.pageTranslation.node.forceRetranslation).toBe(false)
-    expect(result.data.language.targetCode).toBe("jpn")
+    expect(result.data.language.targetCode).toBe("ja")
   })
 
   it("rebuilds schema-valid built-in action state for persistence", async () => {
@@ -196,7 +210,7 @@ describe("createDefaultDictionaryAction layout", () => {
         outputSchema: action.outputSchema,
         value,
         selection: "blossom",
-        targetCode: "cmn",
+        targetCode: "zh-Hans",
         status: "done",
       }),
     )

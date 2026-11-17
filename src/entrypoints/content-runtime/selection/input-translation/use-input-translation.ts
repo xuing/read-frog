@@ -1,4 +1,4 @@
-import type { LangCodeISO6393 } from "@read-frog/definitions"
+import type { LanguageTag } from "@read-frog/definitions"
 import { useAtomValue } from "jotai"
 import { useCallback, useEffect, useRef } from "react"
 import { toastManager } from "@/components/ui/base-ui/toast"
@@ -10,8 +10,11 @@ import { configFieldsAtomMap } from "@/utils/atoms/config"
 import { INPUT_REPLACE_REQUEST_TYPE } from "@/utils/constants/input-injector"
 import { getDeepActiveElement } from "@/utils/dom/active-element"
 import { translateTextForInput } from "@/utils/host/translate/translate-variants"
+import { createLogger } from "@/utils/logging/logger"
 import { HostedAiProviderUnavailableError } from "@/utils/providers/provider-ref"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
+
+const log = createLogger("selection/input-translation")
 
 const SPACE_KEY = " "
 const TRIGGER_COUNT = 3
@@ -196,7 +199,7 @@ export function useInputTranslation() {
         ANALYTICS_SURFACE.INPUT_TRANSLATION,
       )
       let providerAnalytics = UNKNOWN_FEATURE_PROVIDER
-      let targetLanguage: LangCodeISO6393 | undefined
+      let targetLanguage: LanguageTag | undefined
 
       try {
         // Capability-resolved so Built-in AI is not reported as unknown.
@@ -255,7 +258,7 @@ export function useInputTranslation() {
             id: HOSTED_UNAVAILABLE_TOAST_ID,
           })
         }
-        console.error("Input translation error:", error)
+        log.error("Input translation failed", { error })
       } finally {
         hideSpinner()
         isTranslatingRef.current = false

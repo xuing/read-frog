@@ -4,15 +4,17 @@ import { storage } from "#imports"
 import { configSchema } from "@/types/config/config"
 import { isAPIProviderConfig } from "@/types/config/provider"
 import { initI18n } from "@/utils/i18n"
+import { createLogger } from "@/utils/logging/logger"
 import {
   buildFreshDefaultConfig,
   CONFIG_SCHEMA_VERSION,
   CONFIG_STORAGE_KEY,
   DEFAULT_CONFIG,
 } from "../constants/config"
-import { logger } from "../logger"
 import { repairForkConfigVersion } from "./fork-repair"
 import { runMigration } from "./migration"
+
+const log = createLogger("config/init")
 
 export interface InitializeConfigResult {
   /**
@@ -61,7 +63,7 @@ export async function initializeConfig(): Promise<InitializeConfigResult> {
       didConfigChange = true
       currentVersion = nextVersion
     } catch (error) {
-      console.error(`Migration to version ${nextVersion} failed:`, error)
+      log.error("Config migration failed", { version: nextVersion, error })
       currentVersion = nextVersion
     }
   }
@@ -72,7 +74,7 @@ export async function initializeConfig(): Promise<InitializeConfigResult> {
     // toolbar's order and pins in step with its actions.
     config = parsedConfig.data
   } else {
-    logger.warn("Config is invalid, using default config")
+    log.warn("Config is invalid, using default config")
     await initI18n(DEFAULT_CONFIG.uiLanguage)
     config = buildFreshDefaultConfig()
     currentVersion = CONFIG_SCHEMA_VERSION

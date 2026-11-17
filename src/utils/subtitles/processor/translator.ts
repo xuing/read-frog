@@ -4,7 +4,7 @@ import type { Config } from "@/types/config/config"
 import type { SubtitlePromptContext } from "@/types/content"
 import type { MatchedTerm } from "@/utils/glossary/types"
 import type { PromptableProviderRef, SerializableProviderRef } from "@/utils/providers/provider-ref"
-import { LANG_CODE_TO_EN_NAME } from "@read-frog/definitions"
+import { LANGUAGE_ENGLISH_NAMES } from "@read-frog/definitions"
 import { APICallError } from "ai"
 import { toastManager } from "@/components/ui/base-ui/toast"
 import { isLLMProviderConfig } from "@/types/config/provider"
@@ -17,7 +17,7 @@ import { Sha256Hex } from "@/utils/hash"
 import { prepareTranslationText } from "@/utils/host/translate/text-preparation"
 import { normalizePromptContextValue } from "@/utils/host/translate/translate-text"
 import { i18n } from "@/utils/i18n"
-import { logger } from "@/utils/logger"
+import { createLogger } from "@/utils/logging/logger"
 import { sendMessage } from "@/utils/message"
 import { getSubtitlesTranslatePrompt } from "@/utils/prompts/subtitles"
 import {
@@ -27,6 +27,8 @@ import {
   serializeProviderRef,
 } from "@/utils/providers/provider-ref"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
+
+const log = createLogger("subtitles/processor/translator")
 
 /**
  * One toast for the whole run, not one per batch: the provider is re-resolved
@@ -145,7 +147,7 @@ async function buildSubtitleHashComponents(
     return hashComponents
   }
 
-  const targetLangName = LANG_CODE_TO_EN_NAME[partialLangConfig.targetCode]
+  const targetLangName = LANGUAGE_ENGLISH_NAMES[partialLangConfig.targetCode]
   // Hashed for the template and the glossary only, with the video context left
   // empty. That context is the page title, the meta description and the AI
   // summary, and none of it is stable across visits: the first two are read
@@ -278,7 +280,7 @@ export async function resolveSubtitlesProvider(
     // Nothing else is expected to throw here (serializeProviderRef already
     // fails open on an unreachable status endpoint). Keep degrading rather
     // than introducing a new throw into the render path, but leave a trace.
-    logger.warn("[Subtitles] Provider ref resolution failed", error)
+    log.warn("Provider ref resolution failed", { error })
     return { status: "none" }
   }
 }

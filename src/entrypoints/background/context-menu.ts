@@ -24,25 +24,15 @@ import { getPageTranslationEnabled, setPageTranslationEnabled } from "./page-tra
 
 const log = createLogger("background/context-menu")
 
-// Resolves once config and i18n are initialized. Menu titles come from i18n.t,
-// which returns "" before initI18n has run, and Chrome refuses a menu item with
-// an empty title ("All menu items except for separators must have a title").
-// That happens on the first start after an update: the config migration writes
-// the config, and the watcher below fires before i18n is ready.
-let whenReady: () => Promise<unknown> = () => Promise.resolve()
-
 /**
  * Register all context menu event listeners synchronously
  * This must be called during main() execution to ensure listeners are registered
  * before Chrome completes initialization
  */
-export function registerContextMenuListeners(ready?: () => Promise<unknown>) {
-  whenReady = ready ?? (() => Promise.resolve())
-
+export function registerContextMenuListeners() {
   // Listen for config changes to update context menu
   storage.watch<Config>(`local:${CONFIG_STORAGE_KEY}`, async (newConfig) => {
     if (newConfig) {
-      await whenReady()
       await updateContextMenuItems(newConfig)
     }
   })
@@ -131,7 +121,6 @@ async function updateContextMenuItems(config: Config) {
  * @param enabled - Optional: if provided, use this value instead of reading from storage
  */
 async function updateTranslateMenuTitle(tabId: number, enabled?: boolean) {
-  await whenReady()
   const config = await ensureInitializedConfig()
   if (!config?.contextMenu.enabled) {
     return

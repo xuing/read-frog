@@ -174,38 +174,6 @@ describe("background context menu", () => {
     expect(browser.contextMenus.update).not.toHaveBeenCalled()
   })
 
-  it("waits for i18n before rebuilding the menu on a config change", async () => {
-    let markReady!: () => void
-    const ready = new Promise<void>((resolve) => {
-      markReady = resolve
-    })
-    let watchCallback: ((config: Config) => Promise<void>) | undefined
-    storage.watch = vi.fn<(...args: any[]) => any>((_key, callback) => {
-      watchCallback = callback as (config: Config) => Promise<void>
-    })
-    registerContextMenuListeners(() => ready)
-    ensureInitializedConfigMock.mockResolvedValue(createConfig(true))
-
-    if (!watchCallback) {
-      throw new Error("Config watcher was not registered")
-    }
-
-    // The config migration writes the config before initI18n has run.
-    const rebuilt = watchCallback(createConfig(true))
-    await Promise.resolve()
-    expect(browser.contextMenus.removeAll).not.toHaveBeenCalled()
-    expect(browser.contextMenus.create).not.toHaveBeenCalled()
-
-    markReady()
-    await rebuilt
-
-    expect(browser.contextMenus.create).toHaveBeenNthCalledWith(1, {
-      id: MENU_ID_TRANSLATE,
-      title: "Translate",
-      contexts: ["page"],
-    })
-  })
-
   it("records a scoped user refusal when the translate menu disables translation", async () => {
     registerContextMenuListeners()
 
